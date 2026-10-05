@@ -3,75 +3,153 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Laben · Comercial</title>
+<title>Nutra Sales · Controladoria Comercial</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--bg:#f6f4f1;--card:#fff;--ink:#2b2118;--mut:#7a6c60;--pri:#6b3e1f;--pri2:#8d5a33;--ok:#1e7d4f;--bad:#b3261e;--warn:#fff4d6;--miss:#fde8e6;--line:#e7e1da}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
-header{background:var(--pri);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10}
-header h1{margin:0;font-size:18px}header small{opacity:.8}
+:root{--bg:#f4f1ec;--card:#fff;--ink:#2b2118;--mut:#7a6c60;--pri:#6b3e1f;--pri2:#8d5a33;--ok:#1e7d4f;--bad:#b3261e;--warn:#b07600;--warnbg:#fff4d6;--miss:#fde8e6;--line:#e7e1da;--okbg:#d5f0e1;--alertbg:#ffe9b0}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+header{background:var(--pri);color:#fff;padding:12px 18px;position:sticky;top:0;z-index:20;flex-shrink:0}
+header .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:18px}header small{opacity:.85;display:block;margin-top:2px}
+.audit{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 10px;font-size:12px;max-width:520px;line-height:1.35}
 nav{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:999px;font-weight:600;cursor:pointer;font-size:14px}
 nav button.on{background:#fff;color:var(--pri)}
-main{padding:14px;max-width:1200px;margin:auto}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
-.formula{background:#fbf7f2;border-left:4px solid var(--pri2);padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5}
-.formula code{font-weight:600}
+main{padding:12px 16px 0;width:100%;max-width:none;flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.formula{background:#fbf7f2;border-left:4px solid var(--pri2);padding:0;border-radius:8px;font-size:13px;line-height:1.5;margin-bottom:10px;flex-shrink:0}
+.formula summary{cursor:pointer;padding:10px 12px;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.formula summary::-webkit-details-marker{display:none}
+.formula .body{padding:0 12px 12px}
+.formula code{font-weight:600;display:block;margin:2px 0}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.bar input,.bar select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
-.bar input[type=search]{flex:1;min-width:180px}
-.btn{background:var(--pri);color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
+.bar input,.bar select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff}
+.bar input[type=search]{flex:1;min-width:160px}
+.btn{background:var(--pri);color:#fff;border:0;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px}
 .btn:disabled{opacity:.4;cursor:default}.btn.sec{background:#fff;color:var(--pri);border:1px solid var(--pri)}
-.tw{overflow-x:auto}
+.tw{overflow:auto;flex:1;min-height:0;border:1px solid var(--line);border-radius:8px;background:#fff}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-th{position:sticky;top:0;background:#faf8f5;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+th,td{padding:8px 7px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:#faf8f5;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;z-index:2;box-shadow:0 1px 0 var(--line)}
 td.n,th.n{text-align:right;white-space:nowrap}
-td input{width:96px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font-size:13px;text-align:right}
+td input{width:88px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;text-align:right}
 td input.txt{text-align:left;width:120px}
-td input.dirty{border-color:#d08a00;background:var(--warn)}
+td input.dirty{border-color:#d08a00;background:var(--warnbg)}
 tr.miss td{background:var(--miss)}
+.comp{font-size:11px;color:var(--mut);line-height:1.45;white-space:nowrap}
+.comp b{color:var(--ink);font-weight:600}
 .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;font-weight:600;margin:1px 2px 1px 0}
 .tag.r{background:#f9d4d0;color:var(--bad)}.tag.y{background:#ffe9b0;color:#7a5200}.tag.g{background:#d5f0e1;color:var(--ok)}
-.pos{color:var(--ok);font-weight:600}.neg{color:var(--bad);font-weight:600}
+.sema{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px}
+.sema.ok{background:var(--okbg);color:var(--ok)}.sema.alerta{background:var(--alertbg);color:#7a5200}.sema.ruim{background:#f9d4d0;color:var(--bad)}.sema.pend{background:#eee;color:var(--mut)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.pos{color:var(--ok);font-weight:700}.neg{color:var(--bad);font-weight:700}
 .muted{color:var(--mut);font-size:12px}
-.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.kpi{background:#faf8f5;border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:120px}
-.kpi b{display:block;font-size:18px}
-.estados{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.kpi{background:#faf8f5;border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:110px}
+.kpi span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.02em}
+.kpi b{display:block;font-size:18px;margin-top:2px}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:10px}
+.gcard{background:#faf8f5;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.gcard .t{font-size:12px;color:var(--mut)}.gcard .v{font-size:16px;font-weight:700;margin-top:2px}.gcard .s{font-size:11px;color:var(--mut);margin-top:2px}
+.estados{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;overflow:auto;flex:1;min-height:0;padding-bottom:12px}
 .estados label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
 .estados input{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:14px}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2118;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:99;max-width:90vw}
-.savebar{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 0;display:flex;gap:8px;align-items:center;justify-content:flex-end}
-.hide{display:none}
-@media(max-width:640px){main{padding:8px}td input{width:78px}th,td{padding:6px 4px}.hm{display:none}}
+.savebar{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 0;display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-shrink:0;z-index:5}
+.hide{display:none!important}
+.panel{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.panel>.card.fill{flex:1;display:flex;flex-direction:column;min-height:0;margin-bottom:0;border-radius:12px 12px 0 0}
+.edit-zone{background:#faf8f5;border:1px dashed var(--line);border-radius:8px;padding:8px;margin-bottom:8px}
+.edit-zone summary{cursor:pointer;font-size:12px;color:var(--mut);font-weight:600}
+.ml{font-size:12px;color:var(--mut)}.ml b{color:var(--ink)}
+@media(max-width:900px){main{padding:8px}.hm{display:none}td input{width:72px}}
 </style>
 </head>
 <body>
 <header>
-  <h1>Laben · Painel Comercial</h1>
-  <small>CMV, condições por estado e formação de preço/margem</small>
+  <div class="top">
+    <div>
+      <h1>Nutra Sales · Controladoria Comercial</h1>
+      <small>Resultado real por produto e linha · Laben &amp; Nutríssima · formação industrial por dentro</small>
+    </div>
+    <div class="audit">Modelo conferido: formação por dentro · Lucro Real · ICMS interestadual sobre preço · sem DIFAL B2B contribuinte.</div>
+  </div>
   <nav>
-    <button data-tab="cmv" class="on">CMV</button>
+    <button data-tab="precos" class="on">Resultado &amp; preços</button>
+    <button data-tab="cmv">CMV</button>
     <button data-tab="estados">Estados</button>
-    <button data-tab="precos">Preços &amp; margem</button>
   </nav>
 </header>
 <main>
-  <div class="card formula">
-    <b>Formação industrial por dentro (sem markup) — todos os custos % sobre o preço:</b><br>
-    <code>ICMS R$ = preço × ICMS%</code><br>
-    <code>PIS R$ = preço × PIS% (Lucro Real 1,65%)</code><br>
-    <code>COFINS R$ = preço × COFINS% (Lucro Real 7,6%)</code><br>
-    <code>frete R$ = preço × frete% &nbsp;|&nbsp; com.+degust. R$ = preço × (com% + deg%)</code><br>
-    <code>custos = CMV + ICMS + PIS + COFINS + frete + com.+degust.</code><br>
-    <code>margem = preço − custos &nbsp;=&nbsp; preço × (1 − ICMS% − PIS% − COFINS% − frete% − com% − deg%) − CMV</code><br>
-    <span class="muted">Origem SP · Nutríssima Lucro Real · B2B contribuinte. Nada de markup sobre CMV — só cálculo por dentro.</span>
-  </div>
+  <details class="formula" id="formulaBox">
+    <summary>
+      <span>Formação por dentro (sem markup no CMV) — % sempre sobre o preço de venda</span>
+      <span class="muted">clique para expandir</span>
+    </summary>
+    <div class="body">
+      <code>ICMS R$ = preço × ICMS%</code>
+      <code>PIS R$ = preço × 1,65% &nbsp;|&nbsp; COFINS R$ = preço × 7,6%</code>
+      <code>frete R$ = preço × frete% &nbsp;|&nbsp; com.+degust. R$ = preço × (com% + deg%)</code>
+      <code>custos = CMV + ICMS + PIS + COFINS + frete + com.+degust.</code>
+      <code>margem = preço − custos = preço × (1 − ICMS% − PIS% − COFINS% − frete% − com% − deg%) − CMV</code>
+      <span class="muted">Origem SP · Nutríssima Lucro Real · B2B contribuinte. Semáforo: ≥10% ok · 0–10% alerta · &lt;0 ruim.</span>
+    </div>
+  </details>
+
+  <!-- PREÇOS / RESULTADO -->
+  <section id="tab-precos" class="panel">
+    <div class="card fill">
+      <div class="bar">
+        <select id="pReg" title="Região"><option value="">Região (todas)</option><option value="Nordeste">Nordeste</option><option value="Norte">Norte</option><option value="Centro-Oeste">Centro-Oeste</option><option value="Sudeste">Sudeste</option><option value="Sul">Sul</option></select>
+        <select id="pAtivas"><option value="1">Só tabelas ativas</option><option value="">Todos os estados</option></select>
+        <select id="pUf"></select>
+        <select id="pFaixa" title="Faixa de pedido"></select>
+        <select id="pMarca"><option value="">Marca (todas)</option><option value="Laben">Laben</option><option value="Nutrissima">Nutríssima</option></select>
+        <select id="pLinha"><option value="">Linha (todas)</option></select>
+        <select id="pGram"><option value="">Gramatura (todas)</option></select>
+        <select id="pMarg"><option value="">Margem (todas)</option><option value="neg">Negativa</option><option value="lt10">&lt; 10%</option><option value="ge10">≥ 10%</option></select>
+        <select id="pPend"><option value="">Pendências (todas)</option><option value="miss">Com pendência</option><option value="nocmv">Sem CMV</option><option value="nopreco">Sem preço</option></select>
+        <input type="search" id="pQ" placeholder="Buscar produto, código, linha…">
+      </div>
+      <div class="kpis" id="pK"></div>
+      <div class="groups" id="pGroups"></div>
+      <div class="muted" id="pEst" style="margin-bottom:8px"></div>
+      <details class="edit-zone">
+        <summary>Edição operacional (faixas · frete · aplicar tabela) — secundário</summary>
+        <div id="faixaEdit" class="muted" style="margin-top:8px"></div>
+        <div class="bar" style="margin-top:8px;margin-bottom:0">
+          <button class="btn sec" type="button" onclick="aplicarTabela()">Aplicar preço tabela → faixa</button>
+          <button class="btn sec" type="button" onclick="aplicarFreteUf()">Gravar frete do estado nos produtos</button>
+        </div>
+      </details>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Produto</th>
+          <th>Marca / linha</th>
+          <th class="n">CMV</th>
+          <th class="n">Preço</th>
+          <th>Composição do preço</th>
+          <th class="n">Custos</th>
+          <th class="n">Margem R$</th>
+          <th class="n">Margem %</th>
+          <th>Semáforo</th>
+          <th class="n hm">Frete %</th>
+          <th class="n hm">F1</th>
+          <th class="n hm">F2</th>
+          <th class="n hm">F3</th>
+        </tr></thead>
+        <tbody id="pB"></tbody>
+      </table></div>
+      <div class="savebar"><span class="muted" id="pD"></span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="pS" disabled onclick="savePrecos()">Salvar preços</button></div>
+    </div>
+  </section>
 
   <!-- CMV -->
-  <section id="tab-cmv">
-    <div class="card">
+  <section id="tab-cmv" class="panel hide">
+    <div class="card fill">
       <div class="kpis" id="cmvK"></div>
       <div class="bar">
         <input type="search" id="cmvQ" placeholder="Buscar sabor / gramatura…">
@@ -83,66 +161,33 @@ tr.miss td{background:var(--miss)}
   </section>
 
   <!-- ESTADOS -->
-  <section id="tab-estados" class="hide">
-    <div class="card" style="border:2px solid var(--pri2)">
+  <section id="tab-estados" class="panel hide">
+    <div class="card" style="border:2px solid var(--pri2);flex-shrink:0">
       <b>Filtro de estados / impostos</b>
-      <div class="muted" style="margin:4px 0 8px">Use estes campos para achar a UF antes de editar ICMS, frete e condições.</div>
+      <div class="muted" style="margin:4px 0 8px">Ache a UF antes de editar ICMS, frete e condições.</div>
       <div class="kpis" id="estK"></div>
       <div class="bar">
         <input type="search" id="estQ" placeholder="Buscar UF / estado…" style="min-width:220px">
         <select id="estF">
           <option value="">Todos os estados</option>
           <option value="ativa">Só tabelas ativas</option>
-          <option value="inativa">Só estrutura (ainda não ativas)</option>
+          <option value="inativa">Só estrutura</option>
           <option value="reg:Nordeste">Nordeste</option>
           <option value="reg:Norte">Norte</option>
           <option value="reg:Centro-Oeste">Centro-Oeste</option>
           <option value="reg:Sudeste">Sudeste</option>
           <option value="reg:Sul">Sul</option>
         </select>
-        <select id="estIcms" title="Filtrar pela alíquota ICMS (origem SP)">
+        <select id="estIcms">
           <option value="">ICMS (todas)</option>
           <option value="7">ICMS 7%</option>
           <option value="12">ICMS 12%</option>
           <option value="18">ICMS 18%</option>
-          <option value="miss">Sem ICMS preenchido</option>
+          <option value="miss">Sem ICMS</option>
         </select>
       </div>
     </div>
     <div class="estados" id="estB"></div>
-  </section>
-
-  <!-- PREÇOS -->
-  <section id="tab-precos" class="hide">
-    <div class="card">
-      <div class="bar">
-        <select id="pReg" title="Filtrar estados por região">
-          <option value="">Região (todas)</option>
-          <option value="Nordeste">Nordeste</option>
-          <option value="Norte">Norte</option>
-          <option value="Centro-Oeste">Centro-Oeste</option>
-          <option value="Sudeste">Sudeste</option>
-          <option value="Sul">Sul</option>
-        </select>
-        <select id="pAtivas"><option value="1">Só tabelas ativas</option><option value="">Todos os estados</option></select>
-        <select id="pUf"></select>
-        <select id="pFaixa" title="Faixa de pedido usada na margem"></select>
-        <input type="search" id="pQ" placeholder="Buscar produto, código, categoria…">
-        <select id="pCat"><option value="">Todas as linhas</option></select>
-        <select id="pF"><option value="">Todos</option><option value="miss">Com pendência</option><option value="nocmv">Sem CMV</option><option value="nopreco">Sem preço</option><option value="neg">Margem negativa</option></select>
-        <button class="btn sec" type="button" onclick="aplicarTabela()">Aplicar preço tabela → faixa</button>
-        <button class="btn sec" type="button" onclick="aplicarFreteUf()">Gravar frete do estado nos produtos</button>
-      </div>
-      <div class="kpis" id="pK"></div>
-      <div class="muted" id="pEst" style="margin-bottom:8px"></div>
-      <div id="faixaEdit" class="muted" style="margin-bottom:10px"></div>
-      <div class="tw"><table><thead><tr>
-        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Impostos R$</th><th class="n">Frete %</th><th class="n">Frete R$</th>
-        <th class="n">Faixa 1</th><th class="n">Faixa 2</th><th class="n">Faixa 3</th>
-        <th class="n">Preço (faixa)</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
-      </tr></thead><tbody id="pB"></tbody></table></div>
-      <div class="savebar"><span class="muted" id="pD"></span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="pS" disabled onclick="savePrecos()">Salvar preços</button></div>
-    </div>
   </section>
 </main>
 <div id="toast"></div>
@@ -155,11 +200,18 @@ const dCmv={},dPre={};
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const pct0=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=s=>{if(s==null)return null;s=String(s).trim();if(s==='')return null;s=s.replace(/[R$\s%]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=parseFloat(s);return isNaN(n)?NaN:n};
 const fmtIn=v=>v==null?'':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:4,useGrouping:false});
 function toast(m,err){const t=$('toast');t.textContent=m;t.style.background=err?'#b3261e':'#2b2118';t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3500)}
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['cmv','estados','precos'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==b.dataset.tab))});
+function marcaOf(p){return (p.marca||'Laben').trim()||'Laben'}
+function linhaOf(p){return (p.linha||p.categoria||'—').trim()||'—'}
+function gramOf(p){const k=(p.chave_cmv||'').split('|')[1];return (k||p.embalagem||'').toUpperCase()||'—'}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  ['cmv','estados','precos'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==b.dataset.tab));
+});
 
 async function loadAll(){
   if((Object.keys(dCmv).length||Object.keys(dPre).length)&&!confirm('Há alterações não salvas. Recarregar mesmo assim?'))return;
@@ -171,15 +223,24 @@ async function loadAll(){
     sb.from('precos_estado').select('*'),
     sb.from('faixas_estado').select('*').order('ordem')]);
   const e=a.error||b.error||c.error||d.error||fx.error;if(e){toast('Erro ao carregar: '+e.message,1);return}
-  CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;FAIX=fx.data;EST.sort((x,y)=>(y.tabela_ativa?1:0)-(x.tabela_ativa?1:0)||x.uf.localeCompare(y.uf));
-  const ord=['350G','1KG','3KG','10KG','20KG'];
-  const ok=k=>{const [s,g]=(k||'|').split('|');return ord.indexOf(g)*100+['AVELA','LEITE','LALA','PISTACHE','CHOCOLATE','AMENDOBEN','MORANGO'].indexOf(s)};
-  PROD.sort((x,y)=>ok(x.chave_cmv)-ok(y.chave_cmv));
+  CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;FAIX=fx.data;
+  EST.sort((x,y)=>(y.tabela_ativa?1:0)-(x.tabela_ativa?1:0)||x.uf.localeCompare(y.uf));
+  const ord=['350G','1KG','3KG','10KG','20KG','250G','300G','450G'];
+  const ok=k=>{const [s,g]=(k||'|').split('|');return ord.indexOf((g||'').toUpperCase())*100+['AVELA','LEITE','LALA','PISTACHE','CHOCOLATE','AMENDOBEN','MORANGO'].indexOf(s)};
+  PROD.sort((x,y)=>ok(x.chave_cmv)-ok(y.chave_cmv)||linhaOf(x).localeCompare(linhaOf(y))||(x.descricao||'').localeCompare(y.descricao||''));
   CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
-  const cats=[...new Set(PROD.map(p=>p.categoria))];const cv=$('pCat').value;
-  $('pCat').innerHTML='<option value="">Todas as linhas</option>'+cats.map(c=>`<option>${esc(c)}</option>`).join('');$('pCat').value=cv;
+  fillLinhaGram();
   fillUfSelect();
   renderCmv();renderEst();renderPre();
+}
+function fillLinhaGram(){
+  const lv=$('pLinha').value,gv=$('pGram').value;
+  const linhas=[...new Set(PROD.map(linhaOf))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const grams=[...new Set(PROD.map(gramOf))].filter(g=>g&&g!=='—').sort((a,b)=>a.localeCompare(b,'pt-BR',{numeric:true}));
+  $('pLinha').innerHTML='<option value="">Linha (todas)</option>'+linhas.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  $('pGram').innerHTML='<option value="">Gramatura (todas)</option>'+grams.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  $('pLinha').value=linhas.includes(lv)?lv:'';
+  $('pGram').value=grams.includes(gv)?gv:'';
 }
 function fillUfSelect(){
   const prev=$('pUf').value;
@@ -201,7 +262,7 @@ function cmvOf(chave){if(chave in dCmv)return dCmv[chave];const r=CMV.find(c=>c.
 function renderCmv(){
   const q=$('cmvQ').value.toLowerCase(),f=$('cmvF').value;
   const miss=CMV.filter(c=>cmvOf(c.chave)==null).length;
-  $('cmvK').innerHTML=`<div class="kpi">Chaves<b>${CMV.length}</b></div><div class="kpi">Com CMV<b class="pos">${CMV.length-miss}</b></div><div class="kpi">Sem CMV<b class="neg">${miss}</b></div>`;
+  $('cmvK').innerHTML=`<div class="kpi"><span>Chaves</span><b>${CMV.length}</b></div><div class="kpi"><span>Com CMV</span><b class="pos">${CMV.length-miss}</b></div><div class="kpi"><span>Sem CMV</span><b class="neg">${miss}</b></div>`;
   $('cmvB').innerHTML=CMV.filter(c=>{const v=cmvOf(c.chave);if(f==='miss'&&v!=null)return false;if(f==='ok'&&v==null)return false;return !q||(c.chave+' '+c.produto+' '+c.gramatura).toLowerCase().includes(q)}).map(c=>{
     const v=cmvOf(c.chave),dirty=c.chave in dCmv;
     return `<tr class="${v==null?'miss':''}"><td><b>${esc(c.chave)}</b>${v==null?' <span class="tag r">sem CMV</span>':''}</td><td>${esc(c.produto)}</td><td>${esc(c.gramatura)}</td>
@@ -234,24 +295,23 @@ function renderEst(){
     }
     return !q||(e.uf+' '+e.nome+' '+(e.regiao||'')+' ICMS '+(e.imposto_pct==null?'':(Number(e.imposto_pct)*100)+'%')).toLowerCase().includes(q);
   });
-  $('estK')&&($('estK').innerHTML=`<div class="kpi">UFs<b>${EST.length}</b></div><div class="kpi">Tabelas ativas<b class="pos">${EST.filter(e=>e.tabela_ativa).length}</b></div><div class="kpi">Origem<b>SP</b></div>`);
+  $('estK')&&($('estK').innerHTML=`<div class="kpi"><span>UFs</span><b>${EST.length}</b></div><div class="kpi"><span>Tabelas ativas</span><b class="pos">${EST.filter(e=>e.tabela_ativa).length}</b></div><div class="kpi"><span>Origem</span><b>SP</b></div>`);
   $('estB').innerHTML=list.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span> <span class="tag ${e.tabela_ativa?'g':'y'}">${e.tabela_ativa?'tabela ativa':'estrutura pronta'}</span> <span class="tag ${e.imposto_pct==null?'r':'g'}">ICMS ${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</span> <span class="tag g">PIS ${e.pis_pct==null?'—':pct(Number(e.pis_pct))}</span> <span class="tag g">COFINS ${e.cofins_pct==null?'—':pct(Number(e.cofins_pct))}</span> <span class="muted">${esc(e.regiao||'')}</span></h3>
   <label><input type="checkbox" id="e_${e.uf}_tabela_ativa" ${e.tabela_ativa?'checked':''}> Tabela ativa (pronta para uso comercial)</label>
   <label>ICMS % sobre preço de venda (origem SP → ${e.uf})</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 7">
   <label>PIS % sobre preço (Lucro Real)</label><input inputmode="decimal" id="e_${e.uf}_pis_pct" value="${e.pis_pct==null?'':fmtIn(e.pis_pct*100)}" placeholder="1,65">
   <label>COFINS % sobre preço (Lucro Real)</label><input inputmode="decimal" id="e_${e.uf}_cofins_pct" value="${e.cofins_pct==null?'':fmtIn(e.cofins_pct*100)}" placeholder="7,6">
-  <label>Frete CIF padrão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Salve a UF ou use “Fixar frete na tabela de preços” para gravar em todos os produtos desse estado.</span>
+  <label>Frete CIF padrão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Salve a UF ou use “Fixar frete na tabela de preços”.</span>
   <label>Comissão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
   <label>Degustação (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
   <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
   <label>Lead time (dias)</label><input id="e_${e.uf}_lead_time" value="${esc(e.lead_time||'')}" placeholder="ex.: 15-18">
   <label>Pedido mínimo (R$)</label><input inputmode="decimal" id="e_${e.uf}_pedido_minimo" value="${e.pedido_minimo==null?'':fmtIn(e.pedido_minimo)}">
-  <p class="muted" style="margin:10px 0 0">B2B contribuinte · ICMS + PIS + COFINS + frete + comissão/degustação por dentro sobre o preço. Ative a tabela quando frete/preços estiverem preenchidos.</p>
+  <p class="muted" style="margin:10px 0 0">B2B contribuinte · ICMS + PIS + COFINS + frete + comissão/degustação por dentro sobre o preço.</p>
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center"><span class="muted" style="margin-right:auto">${e.updated_at?'Atualizado '+new Date(e.updated_at).toLocaleString('pt-BR'):''}</span>
   <button class="btn sec" type="button" onclick="fixarFreteUf('${e.uf}')">Fixar frete na tabela de preços</button>
   <button class="btn" onclick="saveEst('${e.uf}')">Salvar ${e.uf}</button></div></div>`).join('')||'<div class="card muted">Nenhum estado com esse filtro.</div>';
 }
-
 async function fixarFreteUf(uf){
   const el=$(`e_${uf}_frete_pct`);
   let fr=num(el?el.value:'');
@@ -268,7 +328,7 @@ async function fixarFreteUf(uf){
     const {error:e2}=await sb.from('precos_estado').update({frete_cif:fr,updated_at:now}).eq('id',r.id);
     if(e2){errs++;console.error(e2)}else{r.frete_cif=fr;r.updated_at=now;n++;delete dPre[r.id+'|frete_cif']}
   }
-  toast(errs?`Frete salvo no estado; ${errs} erro(s) nos produtos`:`Frete ${pct(fr)} fixado em ${uf}: ${n} produto(s) na tabela de preços ✔`,errs);
+  toast(errs?`Frete salvo no estado; ${errs} erro(s) nos produtos`:`Frete ${pct(fr)} fixado em ${uf}: ${n} produto(s) ✔`,errs);
   renderEst();renderPre();
 }
 async function saveEst(uf){
@@ -281,7 +341,7 @@ async function saveEst(uf){
   Object.assign(EST.find(e=>e.uf===uf),row);toast(uf+' salvo ✔');renderEst();renderPre();
 }
 
-/* ---------- PREÇOS ---------- */
+/* ---------- PREÇOS (modelo por dentro — NÃO alterar) ---------- */
 const F=['frete_cif','preco_f1','preco_f2','preco_f3','preco_final'];
 function preRow(uf,pid){return PRE.find(r=>r.uf===uf&&r.produto_id===pid)}
 function val(r,f){const k=r.id+'|'+f;if(k in dPre)return dPre[k];return r[f]==null?null:Number(r[f])}
@@ -300,7 +360,7 @@ function syncFaixaSelect(uf){
   $('pFaixa').innerHTML=list.map(f=>`<option value="${f.ordem}">${esc(faixaLabel(f))}</option>`).join('')||'<option value="1">Faixa 1</option>';
   $('pFaixa').value=list.some(f=>String(f.ordem)===String(cur))?cur:(list[0]?.ordem||'1');
   const f=list.find(x=>String(x.ordem)===$('pFaixa').value)||list[0];
-  $('faixaEdit').innerHTML=f?`Faixas de pedido em ${uf}: edite valores abaixo e salve o estado na aba Estados se mudar o mínimo.
+  $('faixaEdit').innerHTML=f?`Faixas de pedido em ${uf}:
   <div class="bar" style="margin-top:6px">
     <input class="txt" style="min-width:160px" id="fx_nome" value="${esc(f.nome)}" placeholder="Nome da faixa">
     <input inputmode="decimal" id="fx_de" value="${f.pedido_de==null?'':fmtIn(f.pedido_de)}" placeholder="Pedido de R$">
@@ -321,7 +381,6 @@ async function saveFaixaMeta(uf){
 function precoFaixa(r,ord,p){
   const k=faixaKey(Number(ord)||1);let v=val(r,k);
   if(v==null&&Number(ord)===1){const pf=val(r,'preco_final');if(pf!=null)return pf}
-  /* se a faixa ainda não foi preenchida, usa preço tabela do produto para conferir margem */
   if(v==null&&p&&p.preco_tabela!=null)return Number(p.preco_tabela);
   return v;
 }
@@ -338,47 +397,106 @@ function calc(p,r,e,ord){
   const hasImp=icms!=null||pis!=null||cof!=null;
   const im=hasImp?(icms||0)+(pis||0)+(cof||0):null;
   const fr=pf!=null&&frPct!=null?pf*frPct:null;
-  if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false};
+  if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false,carga:null};
   const vv=pf*cd;
   const custos=cmv+(im||0)+(fr||0)+vv;
   const m=pf-custos;
   const fromTabela=val(r,faixaKey(Number(ord)||1))==null&&val(r,'preco_final')==null&&p.preco_tabela!=null;
-  return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null,fromTabela};
+  const carga=(imPct||0)+(pisPct||0)+(cofPct||0);
+  return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null,fromTabela,carga};
+}
+function semaforo(c){
+  if(c.cmv==null||c.pf==null||c.m==null)return {cls:'pend',label:'Pendência'};
+  if(c.mp<0)return {cls:'ruim',label:'Ruim'};
+  if(c.mp<0.10)return {cls:'alerta',label:'Alerta'};
+  return {cls:'ok',label:'Ok'};
+}
+function compHtml(c){
+  if(c.pf==null)return '<span class="muted">Sem preço</span>';
+  const line=(lab,p,v)=>`<div><b>${lab}</b> ${p==null?'—':pct0(p)} · ${brl(v)}</div>`;
+  return `<div class="comp">${line('ICMS',c.imPct,c.icms)}${line('PIS',c.pisPct,c.pis)}${line('COFINS',c.cofPct,c.cof)}${line('Frete',c.frPct,c.fr)}${line('Com+Deg',c.cd,c.vv)}</div>`;
 }
 function renderPre(){
   const uf=$('pUf').value;const e=EST.find(x=>x.uf===uf);if(!e)return;
   syncFaixaSelect(uf);
   const ord=Number($('pFaixa').value||1);
   $('pEst').innerHTML=`${e.uf}: ICMS <b>${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</b> · PIS <b>${e.pis_pct==null?'—':pct(Number(e.pis_pct))}</b> · COFINS <b>${e.cofins_pct==null?'—':pct(Number(e.cofins_pct))}</b> · frete <b>${e.frete_pct==null?'—':pct(Number(e.frete_pct))}</b> · comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))} · conferindo <b>faixa ${ord}</b>`;
-  const q=$('pQ').value.toLowerCase(),cat=$('pCat').value,f=$('pF').value;
-  let nC=0,nP=0,sM=0,sR=0,nOk=0,nNeg=0;
-  const rows=[];
-  for(const p of PROD){const r=preRow(uf,p.id);if(!r)continue;const c=calc(p,r,e,ord);
-    if(c.cmv==null)nC++;if(c.pf==null)nP++;if(c.m!=null){nOk++;sM+=c.m;sR+=c.pf;if(c.m<0)nNeg++}
-    if(cat&&p.categoria!==cat)continue;
-    if(q&&!((p.descricao+' '+(p.codigo||'')+' '+p.categoria+' '+p.chave_cmv).toLowerCase().includes(q)))continue;
-    if(f==='nocmv'&&c.cmv!=null)continue;if(f==='nopreco'&&c.pf!=null)continue;if(f==='miss'&&c.cmv!=null&&c.pf!=null)continue;if(f==='neg'&&!(c.m<0))continue;
-    rows.push([p,r,c]);}
-  $('pK').innerHTML=`<div class="kpi">Produtos<b>${PROD.length}</b></div><div class="kpi">Sem CMV<b class="neg">${nC}</b></div><div class="kpi">Sem preço (faixa)<b class="neg">${nP}</b></div><div class="kpi">Margem média<b class="${sM<0?'neg':'pos'}">${nOk?pct(sM/sR):'—'}</b></div><div class="kpi">Margem negativa<b class="neg">${nNeg}</b></div>`;
+  const q=$('pQ').value.toLowerCase(),linha=$('pLinha').value,marca=$('pMarca').value,gram=$('pGram').value,marg=$('pMarg').value,pend=$('pPend').value;
+  let nC=0,nP=0,sM=0,sR=0,nOk=0,nNeg=0,sCmv=0,nCmv=0,sCarga=0,nCarga=0;
+  const rows=[], byLinha={}, byMarca={};
+  for(const p of PROD){
+    const r=preRow(uf,p.id);if(!r)continue;const c=calc(p,r,e,ord);
+    if(c.cmv==null)nC++;if(c.pf==null)nP++;
+    if(c.m!=null){nOk++;sM+=c.m;sR+=c.pf;if(c.m<0)nNeg++}
+    if(c.cmv!=null){sCmv+=c.cmv;nCmv++}
+    if(c.carga!=null){sCarga+=c.carga;nCarga++}
+    const mk=marcaOf(p), ln=linhaOf(p), gr=gramOf(p);
+    if(marca&&mk!==marca)continue;
+    if(linha&&ln!==linha)continue;
+    if(gram&&gr!==gram)continue;
+    if(q&&!((p.descricao+' '+(p.codigo||'')+' '+ln+' '+mk+' '+p.chave_cmv+' '+(p.categoria||'')).toLowerCase().includes(q)))continue;
+    if(pend==='nocmv'&&c.cmv!=null)continue;
+    if(pend==='nopreco'&&c.pf!=null)continue;
+    if(pend==='miss'&&c.cmv!=null&&c.pf!=null)continue;
+    if(marg==='neg'&&!(c.m!=null&&c.m<0))continue;
+    if(marg==='lt10'&&!(c.mp!=null&&c.mp<0.10))continue;
+    if(marg==='ge10'&&!(c.mp!=null&&c.mp>=0.10))continue;
+    rows.push([p,r,c]);
+    const bump=(map,key)=>{if(!map[key])map[key]={n:0,sM:0,sR:0,nOk:0,nNeg:0};map[key].n++;if(c.m!=null){map[key].nOk++;map[key].sM+=c.m;map[key].sR+=c.pf;if(c.m<0)map[key].nNeg++}};
+    bump(byLinha,ln);bump(byMarca,mk);
+  }
+  const filtN=rows.length;
+  const filtSM=rows.reduce((a,[, ,c])=>a+(c.m||0),0);
+  const filtSR=rows.reduce((a,[, ,c])=>a+(c.pf&&c.m!=null?c.pf:0),0);
+  const filtNeg=rows.filter(([, ,c])=>c.m!=null&&c.m<0).length;
+  const filtCmv=rows.filter(([, ,c])=>c.cmv!=null);
+  const filtCarga=rows.filter(([, ,c])=>c.carga!=null);
+  const avgCmv=filtCmv.length?filtCmv.reduce((a,[, ,c])=>a+c.cmv,0)/filtCmv.length:null;
+  const avgCarga=filtCarga.length?filtCarga.reduce((a,[, ,c])=>a+c.carga,0)/filtCarga.length:null;
+  const negPct=filtN?filtNeg/filtN:null;
+  $('pK').innerHTML=`
+    <div class="kpi"><span>Produtos filtrados</span><b>${filtN}</b></div>
+    <div class="kpi"><span>Margem média %</span><b class="${filtSR&&filtSM/filtSR<0?'neg':'pos'}">${filtSR?pct(filtSM/filtSR):'—'}</b></div>
+    <div class="kpi"><span>Margem R$ total</span><b class="${filtSM<0?'neg':'pos'}">${brl(filtN?filtSM:null)}</b></div>
+    <div class="kpi"><span>% margem negativa</span><b class="neg">${negPct==null?'—':pct(negPct)}</b></div>
+    <div class="kpi"><span>CMV médio</span><b>${brl(avgCmv)}</b></div>
+    <div class="kpi"><span>Carga tributária média</span><b>${avgCarga==null?'—':pct(avgCarga)}</b></div>
+    <div class="kpi"><span>Catálogo (UF)</span><b>${PROD.length}</b></div>
+    <div class="kpi"><span>Sem CMV / sem preço</span><b class="neg">${nC} / ${nP}</b></div>`;
+  const cards=[];
+  Object.keys(byMarca).sort().forEach(k=>{
+    const g=byMarca[k];const mp=g.sR?g.sM/g.sR:null;
+    cards.push(`<div class="gcard"><div class="t">Marca · ${esc(k)}</div><div class="v ${mp!=null&&mp<0?'neg':''}">${mp==null?'—':pct(mp)}</div><div class="s">${g.n} SKU · margem ${brl(g.sM)} · neg. ${g.nNeg}</div></div>`);
+  });
+  Object.keys(byLinha).sort((a,b)=>a.localeCompare(b,'pt-BR')).forEach(k=>{
+    const g=byLinha[k];const mp=g.sR?g.sM/g.sR:null;
+    cards.push(`<div class="gcard"><div class="t">Linha · ${esc(k)}</div><div class="v ${mp!=null&&mp<0?'neg':''}">${mp==null?'—':pct(mp)}</div><div class="s">${g.n} SKU · margem ${brl(g.sM)} · neg. ${g.nNeg}</div></div>`);
+  });
+  if(!Object.keys(byMarca).some(k=>k==='Nutrissima')&&!PROD.some(p=>marcaOf(p)==='Nutrissima')){
+    cards.push(`<div class="gcard"><div class="t">Marca · Nutríssima</div><div class="v muted">—</div><div class="s">Catálogo ainda vazio (e-commerce em breve)</div></div>`);
+  }
+  $('pGroups').innerHTML=cards.join('')||'<div class="muted">Nenhum agrupamento com o filtro atual.</div>';
   $('pB').innerHTML=rows.map(([p,r,c])=>{
     const miss=c.cmv==null||c.pf==null;
-    const inp=(f,pct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${pct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${pct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
-    const tab=p.preco_tabela==null?null:Number(p.preco_tabela);
-    const imTxt=c.im==null?'—':`${brl(c.im)}<br><span class="muted" style="font-size:11px">ICMS ${brl(c.icms)} · PIS ${brl(c.pis)} · COF ${brl(c.cof)}</span>`;
-    const frInp=(()=>{const raw=val(r,'frete_cif');const eff=raw!=null?raw:(e.frete_pct==null?null:Number(e.frete_pct));const dirty=(r.id+'|frete_cif') in dPre;return `<input inputmode="decimal" data-id="${r.id}" data-f="frete_cif" data-pct="1" class="${dirty?'dirty':''}" value="${eff==null?'':fmtIn(eff*100)}" placeholder="${e.frete_pct==null?'—':fmtIn(Number(e.frete_pct)*100)+' (UF)'}" title="${raw==null&&e.frete_pct!=null?'Herdado do estado — edite para sobrescrever':'Frete do produto'}%" onchange="editPre(this)">`})();
-    return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
-      ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
-      <td class="n hm">${brl(tab)}</td>
+    const inp=(f,isPct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${isPct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${isPct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
+    const frInp=(()=>{const raw=val(r,'frete_cif');const eff=raw!=null?raw:(e.frete_pct==null?null:Number(e.frete_pct));const dirty=(r.id+'|frete_cif') in dPre;return `<input inputmode="decimal" data-id="${r.id}" data-f="frete_cif" data-pct="1" class="${dirty?'dirty':''}" value="${eff==null?'':fmtIn(eff*100)}" placeholder="${e.frete_pct==null?'—':fmtIn(Number(e.frete_pct)*100)+' (UF)'}" title="${raw==null&&e.frete_pct!=null?'Herdado do estado':'Frete do produto'}%" onchange="editPre(this)">`})();
+    const sm=semaforo(c);
+    return `<tr class="${miss?'miss':''}">
+      <td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)} · ${esc(gramOf(p))}</span>
+        ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${c.fromTabela?'<span class="tag y">via tabela</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
+      <td class="ml"><b>${esc(marcaOf(p))}</b><br>${esc(linhaOf(p))}</td>
       <td class="n">${brl(c.cmv)}</td>
-      <td class="n">${imTxt}</td>
-      <td class="n">${frInp}</td>
-      <td class="n">${brl(c.fr)}</td>
-      <td class="n">${inp('preco_f1',0)}</td>
-      <td class="n">${inp('preco_f2',0)}</td>
-      <td class="n">${inp('preco_f3',0)}</td>
-      <td class="n"><b>${brl(c.pf)}</b>${c.fromTabela?'<br><span class="tag y">via tabela</span>':''}</td>
-      <td class="n hm">${c.pf==null?pct(c.cd):brl(c.pf*c.cd)}</td><td class="n hm">${brl(c.custos)}</td>
-      <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td><td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td></tr>`}).join('')||'<tr><td colspan="14" class="muted">Nenhum produto com esses filtros.</td></tr>';
+      <td class="n"><b>${brl(c.pf)}</b></td>
+      <td>${compHtml(c)}</td>
+      <td class="n">${brl(c.custos)}</td>
+      <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td>
+      <td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td>
+      <td><span class="sema ${sm.cls}"><span class="dot"></span>${sm.label}</span></td>
+      <td class="n hm">${frInp}</td>
+      <td class="n hm">${inp('preco_f1',0)}</td>
+      <td class="n hm">${inp('preco_f2',0)}</td>
+      <td class="n hm">${inp('preco_f3',0)}</td>
+    </tr>`}).join('')||'<tr><td colspan="13" class="muted">Nenhum produto com esses filtros. Nutríssima ainda sem catálogo — use o filtro de marca quando houver dados.</td></tr>';
   const n=Object.keys(dPre).length;$('pS').disabled=!n;$('pD').textContent=n?n+' alteração(ões) pendente(s)':'';
 }
 function editPre(el){let v=num(el.value);if(Number.isNaN(v)){toast('Valor inválido',1);el.value='';return}if(el.dataset.pct==='1')v=v==null?null:v/100;const id=el.dataset.id,f=el.dataset.f,r=PRE.find(x=>x.id===id);const o=r[f]==null?null:Number(r[f]);const k=id+'|'+f;if(o===v)delete dPre[k];else dPre[k]=v;if(['preco_f1','preco_f2','preco_f3'].includes(f)){const ord=Number($('pFaixa').value||1);if(faixaKey(ord)===f){dPre[id+'|preco_final']=v}}renderPre()}
@@ -403,7 +521,7 @@ async function savePrecos(){
 ['cmvQ','cmvF'].forEach(i=>$(i).addEventListener('input',renderCmv));
 ['estQ','estF','estIcms'].forEach(i=>{$(i).addEventListener('input',renderEst);$(i).addEventListener('change',renderEst)});
 ['pReg','pAtivas'].forEach(i=>{$(i).addEventListener('change',()=>{fillUfSelect();renderPre()})});
-['pUf','pQ','pCat','pF','pFaixa'].forEach(i=>{$(i).addEventListener('input',renderPre);$(i).addEventListener('change',renderPre)});
+['pUf','pQ','pLinha','pMarca','pGram','pMarg','pPend','pFaixa'].forEach(i=>{$(i).addEventListener('input',renderPre);$(i).addEventListener('change',renderPre)});
 window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
 loadAll();
 </script>
