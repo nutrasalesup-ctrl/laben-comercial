@@ -83,10 +83,12 @@ tr.miss td{background:var(--miss)}
 
   <!-- ESTADOS -->
   <section id="tab-estados" class="hide">
-    <div class="card">
+    <div class="card" style="border:2px solid var(--pri2)">
+      <b>Filtro de estados / impostos</b>
+      <div class="muted" style="margin:4px 0 8px">Use estes campos para achar a UF antes de editar ICMS, frete e condições.</div>
       <div class="kpis" id="estK"></div>
       <div class="bar">
-        <input type="search" id="estQ" placeholder="Buscar UF / estado…">
+        <input type="search" id="estQ" placeholder="Buscar UF / estado…" style="min-width:220px">
         <select id="estF">
           <option value="">Todos os estados</option>
           <option value="ativa">Só tabelas ativas</option>
@@ -113,6 +115,15 @@ tr.miss td{background:var(--miss)}
   <section id="tab-precos" class="hide">
     <div class="card">
       <div class="bar">
+        <select id="pReg" title="Filtrar estados por região">
+          <option value="">Região (todas)</option>
+          <option value="Nordeste">Nordeste</option>
+          <option value="Norte">Norte</option>
+          <option value="Centro-Oeste">Centro-Oeste</option>
+          <option value="Sudeste">Sudeste</option>
+          <option value="Sul">Sul</option>
+        </select>
+        <select id="pAtivas"><option value="1">Só tabelas ativas</option><option value="">Todos os estados</option></select>
         <select id="pUf"></select>
         <select id="pFaixa" title="Faixa de pedido usada na margem"></select>
         <input type="search" id="pQ" placeholder="Buscar produto, código, categoria…">
@@ -164,12 +175,24 @@ async function loadAll(){
   const ok=k=>{const [s,g]=(k||'|').split('|');return ord.indexOf(g)*100+['AVELA','LEITE','LALA','PISTACHE','CHOCOLATE','AMENDOBEN','MORANGO'].indexOf(s)};
   PROD.sort((x,y)=>ok(x.chave_cmv)-ok(y.chave_cmv));
   CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
-  const uf=$('pUf').value;
-  $('pUf').innerHTML=EST.map(e=>`<option value="${e.uf}">${e.uf} · ${esc(e.nome)}${e.tabela_ativa?' ★':''} · ICMS ${e.imposto_pct==null?'—':(Number(e.imposto_pct)*100).toFixed(0)+'%'}</option>`).join('');
-  $('pUf').value=uf||(EST.some(e=>e.uf==='PE')?'PE':EST[0]?.uf);
   const cats=[...new Set(PROD.map(p=>p.categoria))];const cv=$('pCat').value;
   $('pCat').innerHTML='<option value="">Todas as linhas</option>'+cats.map(c=>`<option>${esc(c)}</option>`).join('');$('pCat').value=cv;
+  fillUfSelect();
   renderCmv();renderEst();renderPre();
+}
+function fillUfSelect(){
+  const prev=$('pUf').value;
+  const reg=$('pReg')?.value||'';
+  const soAtivas=$('pAtivas')?.value==='1';
+  let list=EST.filter(e=>{
+    if(soAtivas&&!e.tabela_ativa)return false;
+    if(reg&&e.regiao!==reg)return false;
+    return true;
+  });
+  if(!list.length)list=[...EST];
+  $('pUf').innerHTML=list.map(e=>`<option value="${e.uf}">${e.uf} · ${esc(e.nome)}${e.tabela_ativa?' ★':''} · ICMS ${e.imposto_pct==null?'—':(Number(e.imposto_pct)*100).toFixed(0)+'%'} · frete ${e.frete_pct==null?'—':(Number(e.frete_pct)*100).toFixed(1)+'%'}</option>`).join('');
+  const prefer=prev&&list.some(e=>e.uf===prev)?prev:(list.find(e=>e.uf==='PE')||list[0])?.uf;
+  $('pUf').value=prefer||'';
 }
 
 /* ---------- CMV ---------- */
@@ -339,8 +362,9 @@ async function savePrecos(){
 }
 
 ['cmvQ','cmvF'].forEach(i=>$(i).addEventListener('input',renderCmv));
-['estQ','estF','estIcms'].forEach(i=>$(i).addEventListener('input',renderEst));
-['pUf','pQ','pCat','pF','pFaixa'].forEach(i=>$(i).addEventListener('input',renderPre));
+['estQ','estF','estIcms'].forEach(i=>{$(i).addEventListener('input',renderEst);$(i).addEventListener('change',renderEst)});
+['pReg','pAtivas'].forEach(i=>{$(i).addEventListener('change',()=>{fillUfSelect();renderPre()})});
+['pUf','pQ','pCat','pF','pFaixa'].forEach(i=>{$(i).addEventListener('input',renderPre);$(i).addEventListener('change',renderPre)});
 window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
 loadAll();
 </script>
