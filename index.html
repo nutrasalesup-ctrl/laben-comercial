@@ -59,10 +59,13 @@ tr.miss td{background:var(--miss)}
 </header>
 <main>
   <div class="card formula">
-    <b>Fórmula da margem (por unidade):</b><br>
-    <code>margem R$ = preço final − CMV − (preço final × frete%) − impostos − preço final × (comissão% + degustação%)</code><br>
+    <b>Formação de preço sem markup — margem por unidade:</b><br>
+    <code>impostos R$ = CMV × imposto% do estado</code><br>
+    <code>frete R$ = preço final × frete%</code><br>
+    <code>com.+degust. R$ = preço final × (comissão% + degustação%)</code><br>
+    <code>margem R$ = preço final − CMV − impostos − frete − com.+degust.</code><br>
     <code>margem % = margem R$ ÷ preço final</code><br>
-    <span class="muted">Comissão e degustação vêm da aba Estados. CMV vem da aba CMV. Frete CIF é % do preço final; impostos e preço final são R$ por unidade. Sem preço final, a margem fica em —.</span>
+    <span class="muted">Imposto %, comissão e degustação ficam na aba Estados (por UF). CMV na aba CMV. Na aba Preços você informa frete % e preço final. Sem preço final, a margem fica em —.</span>
   </div>
 
   <!-- CMV -->
@@ -95,7 +98,7 @@ tr.miss td{background:var(--miss)}
       <div class="kpis" id="pK"></div>
       <div class="muted" id="pEst" style="margin-bottom:8px"></div>
       <div class="tw"><table><thead><tr>
-        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Frete CIF %</th><th class="n">Impostos</th><th class="n">Preço final</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
+        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Impostos R$</th><th class="n">Frete CIF %</th><th class="n">Preço final</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
       </tr></thead><tbody id="pB"></tbody></table></div>
       <div class="savebar"><span class="muted" id="pD"></span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="pS" disabled onclick="savePrecos()">Salvar preços</button></div>
     </div>
@@ -162,38 +165,42 @@ async function saveCmv(){
 /* ---------- ESTADOS ---------- */
 function renderEst(){
   $('estB').innerHTML=EST.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span></h3>
+  <label>Imposto do estado (% sobre CMV)</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 18">
   <label>Comissão (%)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
   <label>Degustação (%)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
   <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
   <label>Lead time (dias)</label><input id="e_${e.uf}_lead_time" value="${esc(e.lead_time||'')}" placeholder="ex.: 15-18">
   <label>Pedido mínimo (R$)</label><input inputmode="decimal" id="e_${e.uf}_pedido_minimo" value="${e.pedido_minimo==null?'':fmtIn(e.pedido_minimo)}">
+  <p class="muted" style="margin:10px 0 0">Impostos R$ = CMV × imposto%. Sem markup: a margem sai do preço final menos CMV, impostos, frete e comissão/degustação.</p>
   <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center"><span class="muted">${e.updated_at?'Atualizado '+new Date(e.updated_at).toLocaleString('pt-BR'):''}</span><button class="btn" onclick="saveEst('${e.uf}')">Salvar ${e.uf}</button></div></div>`).join('');
 }
 async function saveEst(uf){
   const g=f=>$(`e_${uf}_${f}`).value;
-  const c=num(g('comissao_pct')),d=num(g('degustacao_pct')),pm=num(g('pedido_minimo'));
-  if([c,d,pm].some(Number.isNaN)){toast('Valor numérico inválido',1);return}
-  const row={comissao_pct:c==null?null:c/100,degustacao_pct:d==null?null:d/100,prazo_pgto:g('prazo_pgto').trim()||null,lead_time:g('lead_time').trim()||null,pedido_minimo:pm,updated_at:new Date().toISOString()};
+  const c=num(g('comissao_pct')),d=num(g('degustacao_pct')),im=num(g('imposto_pct')),pm=num(g('pedido_minimo'));
+  if([c,d,im,pm].some(Number.isNaN)){toast('Valor numérico inválido',1);return}
+  const row={comissao_pct:c==null?null:c/100,degustacao_pct:d==null?null:d/100,imposto_pct:im==null?null:im/100,prazo_pgto:g('prazo_pgto').trim()||null,lead_time:g('lead_time').trim()||null,pedido_minimo:pm,updated_at:new Date().toISOString()};
   const {error}=await sb.from('estados').update(row).eq('uf',uf);
   if(error){toast('Erro: '+error.message,1);return}
   Object.assign(EST.find(e=>e.uf===uf),row);toast(uf+' salvo ✔');renderEst();renderPre();
 }
 
 /* ---------- PREÇOS ---------- */
-const F=['frete_cif','impostos','preco_final'];
+const F=['frete_cif','preco_final'];
 function preRow(uf,pid){return PRE.find(r=>r.uf===uf&&r.produto_id===pid)}
 function val(r,f){const k=r.id+'|'+f;if(k in dPre)return dPre[k];return r[f]==null?null:Number(r[f])}
 function calc(p,r,e){
-  const cmv=cmvOf(p.chave_cmv),frPct=val(r,'frete_cif'),im=val(r,'impostos'),pf=val(r,'preco_final');
+  const cmv=cmvOf(p.chave_cmv),frPct=val(r,'frete_cif'),pf=val(r,'preco_final');
+  const imPct=e.imposto_pct==null?null:Number(e.imposto_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
+  const im=cmv!=null&&imPct!=null?cmv*imPct:null;
   const fr=pf!=null&&frPct!=null?pf*frPct:null;
-  if(pf==null||cmv==null)return {cmv,fr,frPct,im,pf,cd,custos:null,m:null,mp:null};
-  const vv=pf*cd,custos=cmv+(fr||0)+(im||0)+vv,m=pf-custos;
-  return {cmv,fr,frPct,im,pf,cd,vv,custos,m,mp:pf?m/pf:null};
+  if(pf==null||cmv==null)return {cmv,fr,frPct,im,imPct,pf,cd,custos:null,m:null,mp:null};
+  const vv=pf*cd,custos=cmv+(im||0)+(fr||0)+vv,m=pf-custos;
+  return {cmv,fr,frPct,im,imPct,pf,cd,vv,custos,m,mp:pf?m/pf:null};
 }
 function renderPre(){
   const uf=$('pUf').value;const e=EST.find(x=>x.uf===uf);if(!e)return;
-  $('pEst').innerHTML=`${e.uf}: comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))}`;
+  $('pEst').innerHTML=`${e.uf}: imposto s/ CMV <b>${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</b> · comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))}`;
   const q=$('pQ').value.toLowerCase(),cat=$('pCat').value,f=$('pF').value;
   let nC=0,nP=0,sM=0,sR=0,nOk=0,nNeg=0;
   const rows=[];
@@ -210,7 +217,7 @@ function renderPre(){
     return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
       ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
       <td class="n hm">${brl(p.preco_tabela==null?null:Number(p.preco_tabela))}</td>
-      <td class="n">${brl(c.cmv)}</td><td class="n">${inp('frete_cif',1)}</td><td class="n">${inp('impostos',0)}</td><td class="n">${inp('preco_final',0)}</td>
+      <td class="n">${brl(c.cmv)}</td><td class="n" title="${c.imPct==null?'Defina imposto% na aba Estados':pct(c.imPct)+' s/ CMV'}">${brl(c.im)}</td><td class="n">${inp('frete_cif',1)}</td><td class="n">${inp('preco_final',0)}</td>
       <td class="n hm">${c.pf==null?pct(c.cd):brl(c.pf*c.cd)}</td><td class="n hm">${brl(c.custos)}</td>
       <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td><td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">Nenhum produto com esses filtros.</td></tr>';
   const n=Object.keys(dPre).length;$('pS').disabled=!n;$('pD').textContent=n?n+' alteração(ões) pendente(s)':'';
