@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laben · Comercial</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f6f4f1;--card:#fff;--ink:#2b2118;--mut:#7a6c60;--pri:#6b3e1f;--pri2:#8d5a33;--ok:#1e7d4f;--bad:#b3261e;--warn:#fff4d6;--miss:#fde8e6;--line:#e7e1da}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+header{background:var(--pri);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10}
+header h1{margin:0;font-size:18px}header small{opacity:.8}
+nav{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+nav button{background:rgba(255,255,255,.15);color:#fff;border:0;padding:8px 14px;border-radius:999px;font-weight:600;cursor:pointer;font-size:14px}
+nav button.on{background:#fff;color:var(--pri)}
+main{padding:14px;max-width:1200px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.formula{background:#fbf7f2;border-left:4px solid var(--pri2);padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5}
+.formula code{font-weight:600}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bar input,.bar select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff}
+.bar input[type=search]{flex:1;min-width:180px}
+.btn{background:var(--pri);color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
+.btn:disabled{opacity:.4;cursor:default}.btn.sec{background:#fff;color:var(--pri);border:1px solid var(--pri)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{position:sticky;top:0;background:#faf8f5;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+td.n,th.n{text-align:right;white-space:nowrap}
+td input{width:96px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font-size:13px;text-align:right}
+td input.txt{text-align:left;width:120px}
+td input.dirty{border-color:#d08a00;background:var(--warn)}
+tr.miss td{background:var(--miss)}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;font-weight:600;margin:1px 2px 1px 0}
+.tag.r{background:#f9d4d0;color:var(--bad)}.tag.y{background:#ffe9b0;color:#7a5200}.tag.g{background:#d5f0e1;color:var(--ok)}
+.pos{color:var(--ok);font-weight:600}.neg{color:var(--bad);font-weight:600}
+.muted{color:var(--mut);font-size:12px}
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.kpi{background:#faf8f5;border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:120px}
+.kpi b{display:block;font-size:18px}
+.estados{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.estados label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
+.estados input{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2118;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:99;max-width:90vw}
+.savebar{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 0;display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.hide{display:none}
+@media(max-width:640px){main{padding:8px}td input{width:78px}th,td{padding:6px 4px}.hm{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Laben · Painel Comercial</h1>
+  <small>CMV, condições por estado e formação de preço/margem</small>
+  <nav>
+    <button data-tab="cmv" class="on">CMV</button>
+    <button data-tab="estados">Estados</button>
+    <button data-tab="precos">Preços &amp; margem</button>
+  </nav>
+</header>
+<main>
+  <div class="card formula">
+    <b>Fórmula da margem (por unidade):</b><br>
+    <code>margem R$ = preço final − CMV − frete − impostos − preço final × (comissão% + degustação%)</code><br>
+    <code>margem % = margem R$ ÷ preço final</code><br>
+    <span class="muted">Comissão e degustação vêm da aba Estados (por UF). CMV vem da aba CMV (pela chave sabor|gramatura). Frete CIF e impostos são valores em R$ por unidade, preenchidos por UF na aba Preços.</span>
+  </div>
+
+  <!-- CMV -->
+  <section id="tab-cmv">
+    <div class="card">
+      <div class="kpis" id="cmvK"></div>
+      <div class="bar">
+        <input type="search" id="cmvQ" placeholder="Buscar sabor / gramatura…">
+        <select id="cmvF"><option value="">Todos</option><option value="miss">Só sem CMV</option><option value="ok">Só com CMV</option></select>
+      </div>
+      <div class="tw"><table><thead><tr><th>Chave</th><th>Produto</th><th>Gramatura</th><th class="n">CMV (R$)</th><th class="hm">Data ref.</th><th class="hm">Atualizado</th></tr></thead><tbody id="cmvB"></tbody></table></div>
+      <div class="savebar"><span class="muted" id="cmvD"></span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="cmvS" disabled onclick="saveCmv()">Salvar CMV</button></div>
+    </div>
+  </section>
+
+  <!-- ESTADOS -->
+  <section id="tab-estados" class="hide">
+    <div class="estados" id="estB"></div>
+  </section>
+
+  <!-- PREÇOS -->
+  <section id="tab-precos" class="hide">
+    <div class="card">
+      <div class="bar">
+        <select id="pUf"></select>
+        <input type="search" id="pQ" placeholder="Buscar produto, código, categoria…">
+        <select id="pCat"><option value="">Todas as linhas</option></select>
+        <select id="pF"><option value="">Todos</option><option value="miss">Com pendência</option><option value="nocmv">Sem CMV</option><option value="nopreco">Sem preço</option><option value="neg">Margem negativa</option></select>
+      </div>
+      <div class="kpis" id="pK"></div>
+      <div class="muted" id="pEst" style="margin-bottom:8px"></div>
+      <div class="tw"><table><thead><tr>
+        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Frete CIF</th><th class="n">Impostos</th><th class="n">Preço final</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
+      </tr></thead><tbody id="pB"></tbody></table></div>
+      <div class="savebar"><span class="muted" id="pD"></span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="pS" disabled onclick="savePrecos()">Salvar preços</button></div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const SUPABASE_URL='https://cjwurpumthjumtgjjolt.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqd3VycHVtdGhqdW10Z2pqb2x0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjA2NDAsImV4cCI6MjEwNjc5NjY0MH0.AbauM8x-7czvoHMmatG0MwC_qEsxrrt49uy1wKhsfno';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+let CMV=[],EST=[],PROD=[],PRE=[];
+const dCmv={},dPre={};
+const $=id=>document.getElementById(id);
+const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=s=>{if(s==null)return null;s=String(s).trim();if(s==='')return null;s=s.replace(/[R$\s%]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=parseFloat(s);return isNaN(n)?NaN:n};
+const fmtIn=v=>v==null?'':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:4,useGrouping:false});
+function toast(m,err){const t=$('toast');t.textContent=m;t.style.background=err?'#b3261e':'#2b2118';t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3500)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['cmv','estados','precos'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==b.dataset.tab))});
+
+async function loadAll(){
+  if((Object.keys(dCmv).length||Object.keys(dPre).length)&&!confirm('Há alterações não salvas. Recarregar mesmo assim?'))return;
+  for(const k in dCmv)delete dCmv[k];for(const k in dPre)delete dPre[k];
+  const [a,b,c,d]=await Promise.all([
+    sb.from('cmv').select('*').order('chave'),
+    sb.from('estados').select('*').order('uf'),
+    sb.from('produtos').select('*').eq('ativo',true),
+    sb.from('precos_estado').select('*')]);
+  const e=a.error||b.error||c.error||d.error;if(e){toast('Erro ao carregar: '+e.message,1);return}
+  CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;
+  const ord=['350G','1KG','3KG','10KG','20KG'];
+  const ok=k=>{const [s,g]=(k||'|').split('|');return ord.indexOf(g)*100+['AVELA','LEITE','LALA','PISTACHE','CHOCOLATE','AMENDOBEN','MORANGO'].indexOf(s)};
+  PROD.sort((x,y)=>ok(x.chave_cmv)-ok(y.chave_cmv));
+  CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
+  const uf=$('pUf').value;
+  $('pUf').innerHTML=EST.map(e=>`<option value="${e.uf}">${e.uf} · ${esc(e.nome)}</option>`).join('');
+  $('pUf').value=uf||(EST.some(e=>e.uf==='PE')?'PE':EST[0]?.uf);
+  const cats=[...new Set(PROD.map(p=>p.categoria))];const cv=$('pCat').value;
+  $('pCat').innerHTML='<option value="">Todas as linhas</option>'+cats.map(c=>`<option>${esc(c)}</option>`).join('');$('pCat').value=cv;
+  renderCmv();renderEst();renderPre();
+}
+
+/* ---------- CMV ---------- */
+function cmvOf(chave){if(chave in dCmv)return dCmv[chave];const r=CMV.find(c=>c.chave===chave);return r?r.cmv==null?null:Number(r.cmv):null}
+function renderCmv(){
+  const q=$('cmvQ').value.toLowerCase(),f=$('cmvF').value;
+  const miss=CMV.filter(c=>cmvOf(c.chave)==null).length;
+  $('cmvK').innerHTML=`<div class="kpi">Chaves<b>${CMV.length}</b></div><div class="kpi">Com CMV<b class="pos">${CMV.length-miss}</b></div><div class="kpi">Sem CMV<b class="neg">${miss}</b></div>`;
+  $('cmvB').innerHTML=CMV.filter(c=>{const v=cmvOf(c.chave);if(f==='miss'&&v!=null)return false;if(f==='ok'&&v==null)return false;return !q||(c.chave+' '+c.produto+' '+c.gramatura).toLowerCase().includes(q)}).map(c=>{
+    const v=cmvOf(c.chave),dirty=c.chave in dCmv;
+    return `<tr class="${v==null?'miss':''}"><td><b>${esc(c.chave)}</b>${v==null?' <span class="tag r">sem CMV</span>':''}</td><td>${esc(c.produto)}</td><td>${esc(c.gramatura)}</td>
+    <td class="n"><input inputmode="decimal" class="${dirty?'dirty':''}" data-k="${esc(c.chave)}" value="${fmtIn(v)}" placeholder="—" onchange="editCmv(this)"></td>
+    <td class="hm muted">${c.data_ref?new Date(c.data_ref+'T12:00').toLocaleDateString('pt-BR'):''}</td><td class="hm muted">${c.updated_at?new Date(c.updated_at).toLocaleString('pt-BR'):''}</td></tr>`}).join('');
+  const n=Object.keys(dCmv).length;$('cmvS').disabled=!n;$('cmvD').textContent=n?n+' alteração(ões) pendente(s)':'';
+}
+function editCmv(el){const v=num(el.value);if(Number.isNaN(v)){toast('Valor inválido',1);el.value='';return}const k=el.dataset.k;const orig=CMV.find(c=>c.chave===k).cmv;if((orig==null?null:Number(orig))===v)delete dCmv[k];else dCmv[k]=v;renderCmv();renderPre()}
+async function saveCmv(){
+  $('cmvS').disabled=true;let errs=0;const now=new Date().toISOString();
+  for(const [k,v] of Object.entries(dCmv)){const {error}=await sb.from('cmv').update({cmv:v,updated_at:now}).eq('chave',k);if(error){errs++;console.error(error)}else{const r=CMV.find(c=>c.chave===k);r.cmv=v;r.updated_at=now;delete dCmv[k]}}
+  toast(errs?errs+' erro(s) ao salvar CMV':'CMV salvo ✔',errs);renderCmv();renderPre();
+}
+
+/* ---------- ESTADOS ---------- */
+function renderEst(){
+  $('estB').innerHTML=EST.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span></h3>
+  <label>Comissão (%)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
+  <label>Degustação (%)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
+  <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
+  <label>Lead time (dias)</label><input id="e_${e.uf}_lead_time" value="${esc(e.lead_time||'')}" placeholder="ex.: 15-18">
+  <label>Pedido mínimo (R$)</label><input inputmode="decimal" id="e_${e.uf}_pedido_minimo" value="${e.pedido_minimo==null?'':fmtIn(e.pedido_minimo)}">
+  <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center"><span class="muted">${e.updated_at?'Atualizado '+new Date(e.updated_at).toLocaleString('pt-BR'):''}</span><button class="btn" onclick="saveEst('${e.uf}')">Salvar ${e.uf}</button></div></div>`).join('');
+}
+async function saveEst(uf){
+  const g=f=>$(`e_${uf}_${f}`).value;
+  const c=num(g('comissao_pct')),d=num(g('degustacao_pct')),pm=num(g('pedido_minimo'));
+  if([c,d,pm].some(Number.isNaN)){toast('Valor numérico inválido',1);return}
+  const row={comissao_pct:c==null?null:c/100,degustacao_pct:d==null?null:d/100,prazo_pgto:g('prazo_pgto').trim()||null,lead_time:g('lead_time').trim()||null,pedido_minimo:pm,updated_at:new Date().toISOString()};
+  const {error}=await sb.from('estados').update(row).eq('uf',uf);
+  if(error){toast('Erro: '+error.message,1);return}
+  Object.assign(EST.find(e=>e.uf===uf),row);toast(uf+' salvo ✔');renderEst();renderPre();
+}
+
+/* ---------- PREÇOS ---------- */
+const F=['frete_cif','impostos','preco_final'];
+function preRow(uf,pid){return PRE.find(r=>r.uf===uf&&r.produto_id===pid)}
+function val(r,f){const k=r.id+'|'+f;if(k in dPre)return dPre[k];return r[f]==null?null:Number(r[f])}
+function calc(p,r,e){
+  const cmv=cmvOf(p.chave_cmv),fr=val(r,'frete_cif'),im=val(r,'impostos'),pf=val(r,'preco_final');
+  const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
+  if(pf==null||cmv==null)return {cmv,fr,im,pf,cd,custos:null,m:null,mp:null};
+  const vv=pf*cd,custos=cmv+(fr||0)+(im||0)+vv,m=pf-custos;
+  return {cmv,fr,im,pf,cd,vv,custos,m,mp:pf?m/pf:null};
+}
+function renderPre(){
+  const uf=$('pUf').value;const e=EST.find(x=>x.uf===uf);if(!e)return;
+  $('pEst').innerHTML=`${e.uf}: comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))}`;
+  const q=$('pQ').value.toLowerCase(),cat=$('pCat').value,f=$('pF').value;
+  let nC=0,nP=0,sM=0,sR=0,nOk=0,nNeg=0;
+  const rows=[];
+  for(const p of PROD){const r=preRow(uf,p.id);if(!r)continue;const c=calc(p,r,e);
+    if(c.cmv==null)nC++;if(c.pf==null)nP++;if(c.m!=null){nOk++;sM+=c.m;sR+=c.pf;if(c.m<0)nNeg++}
+    if(cat&&p.categoria!==cat)continue;
+    if(q&&!((p.descricao+' '+(p.codigo||'')+' '+p.categoria+' '+p.chave_cmv).toLowerCase().includes(q)))continue;
+    if(f==='nocmv'&&c.cmv!=null)continue;if(f==='nopreco'&&c.pf!=null)continue;if(f==='miss'&&c.cmv!=null&&c.pf!=null)continue;if(f==='neg'&&!(c.m<0))continue;
+    rows.push([p,r,c]);}
+  $('pK').innerHTML=`<div class="kpi">Produtos<b>${PROD.length}</b></div><div class="kpi">Sem CMV<b class="neg">${nC}</b></div><div class="kpi">Sem preço<b class="neg">${nP}</b></div><div class="kpi">Margem média<b class="${sM<0?'neg':'pos'}">${nOk?pct(sM/sR):'—'}</b></div><div class="kpi">Margem negativa<b class="neg">${nNeg}</b></div>`;
+  $('pB').innerHTML=rows.map(([p,r,c])=>{
+    const miss=c.cmv==null||c.pf==null;
+    const inp=f=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
+    return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
+      ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
+      <td class="n hm">${brl(p.preco_tabela==null?null:Number(p.preco_tabela))}</td>
+      <td class="n">${brl(c.cmv)}</td><td class="n">${inp('frete_cif')}</td><td class="n">${inp('impostos')}</td><td class="n">${inp('preco_final')}</td>
+      <td class="n hm">${c.pf==null?pct(c.cd):brl(c.pf*c.cd)}</td><td class="n hm">${brl(c.custos)}</td>
+      <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td><td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">Nenhum produto com esses filtros.</td></tr>';
+  const n=Object.keys(dPre).length;$('pS').disabled=!n;$('pD').textContent=n?n+' alteração(ões) pendente(s)':'';
+}
+function editPre(el){const v=num(el.value);if(Number.isNaN(v)){toast('Valor inválido',1);el.value='';return}const id=el.dataset.id,f=el.dataset.f,r=PRE.find(x=>x.id===id);const o=r[f]==null?null:Number(r[f]);const k=id+'|'+f;if(o===v)delete dPre[k];else dPre[k]=v;renderPre()}
+async function savePrecos(){
+  $('pS').disabled=true;const by={};for(const [k,v] of Object.entries(dPre)){const [id,f]=k.split('|');(by[id]=by[id]||{})[f]=v}
+  let errs=0;const now=new Date().toISOString();
+  for(const [id,upd] of Object.entries(by)){upd.updated_at=now;const {error}=await sb.from('precos_estado').update(upd).eq('id',id);if(error){errs++;console.error(error)}else{Object.assign(PRE.find(x=>x.id===id),upd);F.forEach(f=>delete dPre[id+'|'+f])}}
+  toast(errs?errs+' erro(s) ao salvar':'Preços salvos ✔',errs);renderPre();
+}
+['cmvQ','cmvF'].forEach(i=>$(i).addEventListener('input',renderCmv));
+['pUf','pQ','pCat','pF'].forEach(i=>$(i).addEventListener('input',renderPre));
+window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
+loadAll();
+</script>
+</body>
+</html>
