@@ -114,14 +114,19 @@ tr.miss td{background:var(--miss)}
     <div class="card">
       <div class="bar">
         <select id="pUf"></select>
+        <select id="pFaixa" title="Faixa de pedido usada na margem"></select>
         <input type="search" id="pQ" placeholder="Buscar produto, código, categoria…">
         <select id="pCat"><option value="">Todas as linhas</option></select>
         <select id="pF"><option value="">Todos</option><option value="miss">Com pendência</option><option value="nocmv">Sem CMV</option><option value="nopreco">Sem preço</option><option value="neg">Margem negativa</option></select>
+        <button class="btn sec" type="button" onclick="aplicarTabela()">Aplicar preço tabela → faixa</button>
       </div>
       <div class="kpis" id="pK"></div>
       <div class="muted" id="pEst" style="margin-bottom:8px"></div>
+      <div id="faixaEdit" class="muted" style="margin-bottom:10px"></div>
       <div class="tw"><table><thead><tr>
-        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Impostos R$</th><th class="n">Frete CIF %</th><th class="n">Preço final</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
+        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Impostos</th><th class="n">Frete CIF %</th>
+        <th class="n">Faixa 1</th><th class="n">Faixa 2</th><th class="n">Faixa 3</th>
+        <th class="n">Preço (faixa)</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
       </tr></thead><tbody id="pB"></tbody></table></div>
       <div class="savebar"><span class="muted" id="pD"></span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="pS" disabled onclick="savePrecos()">Salvar preços</button></div>
     </div>
@@ -132,7 +137,7 @@ tr.miss td{background:var(--miss)}
 const SUPABASE_URL='https://cjwurpumthjumtgjjolt.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqd3VycHVtdGhqdW10Z2pqb2x0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjA2NDAsImV4cCI6MjEwNjc5NjY0MH0.AbauM8x-7czvoHMmatG0MwC_qEsxrrt49uy1wKhsfno';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-let CMV=[],EST=[],PROD=[],PRE=[];
+let CMV=[],EST=[],PROD=[],PRE=[],FAIX=[];
 const dCmv={},dPre={};
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -146,13 +151,14 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.query
 async function loadAll(){
   if((Object.keys(dCmv).length||Object.keys(dPre).length)&&!confirm('Há alterações não salvas. Recarregar mesmo assim?'))return;
   for(const k in dCmv)delete dCmv[k];for(const k in dPre)delete dPre[k];
-  const [a,b,c,d]=await Promise.all([
+  const [a,b,c,d,fx]=await Promise.all([
     sb.from('cmv').select('*').order('chave'),
     sb.from('estados').select('*').order('uf'),
     sb.from('produtos').select('*').eq('ativo',true),
-    sb.from('precos_estado').select('*')]);
-  const e=a.error||b.error||c.error||d.error;if(e){toast('Erro ao carregar: '+e.message,1);return}
-  CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;EST.sort((x,y)=>(y.tabela_ativa?1:0)-(x.tabela_ativa?1:0)||x.uf.localeCompare(y.uf));
+    sb.from('precos_estado').select('*'),
+    sb.from('faixas_estado').select('*').order('ordem')]);
+  const e=a.error||b.error||c.error||d.error||fx.error;if(e){toast('Erro ao carregar: '+e.message,1);return}
+  CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;FAIX=fx.data;EST.sort((x,y)=>(y.tabela_ativa?1:0)-(x.tabela_ativa?1:0)||x.uf.localeCompare(y.uf));
   const ord=['350G','1KG','3KG','10KG','20KG'];
   const ok=k=>{const [s,g]=(k||'|').split('|');return ord.indexOf(g)*100+['AVELA','LEITE','LALA','PISTACHE','CHOCOLATE','AMENDOBEN','MORANGO'].indexOf(s)};
   PROD.sort((x,y)=>ok(x.chave_cmv)-ok(y.chave_cmv));
@@ -226,11 +232,49 @@ async function saveEst(uf){
 }
 
 /* ---------- PREÇOS ---------- */
-const F=['frete_cif','preco_final'];
+const F=['frete_cif','preco_f1','preco_f2','preco_f3','preco_final'];
 function preRow(uf,pid){return PRE.find(r=>r.uf===uf&&r.produto_id===pid)}
 function val(r,f){const k=r.id+'|'+f;if(k in dPre)return dPre[k];return r[f]==null?null:Number(r[f])}
-function calc(p,r,e){
-  const cmv=cmvOf(p.chave_cmv),frPct=val(r,'frete_cif'),pf=val(r,'preco_final');
+function faixaKey(n){return n===1?'preco_f1':n===2?'preco_f2':'preco_f3'}
+function faixasUf(uf){return FAIX.filter(x=>x.uf===uf).sort((a,b)=>a.ordem-b.ordem)}
+function faixaLabel(f){
+  if(!f)return '—';
+  const de=f.pedido_de!=null?'desde '+brl(Number(f.pedido_de)):'';
+  const ate=f.pedido_ate!=null?' até '+brl(Number(f.pedido_ate)):'';
+  const faixa=de||ate?` (${(de+ate).trim()})`:'';
+  return `${f.ordem} · ${f.nome}${faixa}`;
+}
+function syncFaixaSelect(uf){
+  const cur=$('pFaixa').value||'1';
+  const list=faixasUf(uf);
+  $('pFaixa').innerHTML=list.map(f=>`<option value="${f.ordem}">${esc(faixaLabel(f))}</option>`).join('')||'<option value="1">Faixa 1</option>';
+  $('pFaixa').value=list.some(f=>String(f.ordem)===String(cur))?cur:(list[0]?.ordem||'1');
+  const f=list.find(x=>String(x.ordem)===$('pFaixa').value)||list[0];
+  $('faixaEdit').innerHTML=f?`Faixas de pedido em ${uf}: edite valores abaixo e salve o estado na aba Estados se mudar o mínimo.
+  <div class="bar" style="margin-top:6px">
+    <input class="txt" style="min-width:160px" id="fx_nome" value="${esc(f.nome)}" placeholder="Nome da faixa">
+    <input inputmode="decimal" id="fx_de" value="${f.pedido_de==null?'':fmtIn(f.pedido_de)}" placeholder="Pedido de R$">
+    <input inputmode="decimal" id="fx_ate" value="${f.pedido_ate==null?'':fmtIn(f.pedido_ate)}" placeholder="Pedido até R$">
+    <button class="btn sec" type="button" onclick="saveFaixaMeta('${uf}')">Salvar meta da faixa</button>
+  </div>`:'';
+}
+async function saveFaixaMeta(uf){
+  const ord=Number($('pFaixa').value||1);
+  const f=faixasUf(uf).find(x=>x.ordem===ord);if(!f)return;
+  const de=num($('fx_de').value),ate=num($('fx_ate').value);
+  if([de,ate].some(Number.isNaN)){toast('Valor inválido',1);return}
+  const row={nome:($('fx_nome').value||'').trim()||f.nome,pedido_de:de,pedido_ate:ate,updated_at:new Date().toISOString()};
+  const {error}=await sb.from('faixas_estado').update(row).eq('id',f.id);
+  if(error){toast('Erro: '+error.message,1);return}
+  Object.assign(f,row);toast('Faixa atualizada ✔');syncFaixaSelect(uf);renderPre();
+}
+function precoFaixa(r,ord){
+  const k=faixaKey(Number(ord)||1);let v=val(r,k);
+  if(v==null&&Number(ord)===1){const pf=val(r,'preco_final');if(pf!=null)return pf}
+  return v;
+}
+function calc(p,r,e,ord){
+  const cmv=cmvOf(p.chave_cmv),frPct=val(r,'frete_cif'),pf=precoFaixa(r,ord);
   const imPct=e.imposto_pct==null?null:Number(e.imposto_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
   const im=cmv!=null&&imPct!=null?cmv*imPct:null;
@@ -241,38 +285,54 @@ function calc(p,r,e){
 }
 function renderPre(){
   const uf=$('pUf').value;const e=EST.find(x=>x.uf===uf);if(!e)return;
-  $('pEst').innerHTML=`${e.uf}: imposto s/ CMV <b>${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</b> · comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))}`;
+  syncFaixaSelect(uf);
+  const ord=Number($('pFaixa').value||1);
+  $('pEst').innerHTML=`${e.uf}: imposto s/ CMV <b>${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</b> · comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))} · conferindo <b>faixa ${ord}</b>`;
   const q=$('pQ').value.toLowerCase(),cat=$('pCat').value,f=$('pF').value;
   let nC=0,nP=0,sM=0,sR=0,nOk=0,nNeg=0;
   const rows=[];
-  for(const p of PROD){const r=preRow(uf,p.id);if(!r)continue;const c=calc(p,r,e);
+  for(const p of PROD){const r=preRow(uf,p.id);if(!r)continue;const c=calc(p,r,e,ord);
     if(c.cmv==null)nC++;if(c.pf==null)nP++;if(c.m!=null){nOk++;sM+=c.m;sR+=c.pf;if(c.m<0)nNeg++}
     if(cat&&p.categoria!==cat)continue;
     if(q&&!((p.descricao+' '+(p.codigo||'')+' '+p.categoria+' '+p.chave_cmv).toLowerCase().includes(q)))continue;
     if(f==='nocmv'&&c.cmv!=null)continue;if(f==='nopreco'&&c.pf!=null)continue;if(f==='miss'&&c.cmv!=null&&c.pf!=null)continue;if(f==='neg'&&!(c.m<0))continue;
     rows.push([p,r,c]);}
-  $('pK').innerHTML=`<div class="kpi">Produtos<b>${PROD.length}</b></div><div class="kpi">Sem CMV<b class="neg">${nC}</b></div><div class="kpi">Sem preço<b class="neg">${nP}</b></div><div class="kpi">Margem média<b class="${sM<0?'neg':'pos'}">${nOk?pct(sM/sR):'—'}</b></div><div class="kpi">Margem negativa<b class="neg">${nNeg}</b></div>`;
+  $('pK').innerHTML=`<div class="kpi">Produtos<b>${PROD.length}</b></div><div class="kpi">Sem CMV<b class="neg">${nC}</b></div><div class="kpi">Sem preço (faixa)<b class="neg">${nP}</b></div><div class="kpi">Margem média<b class="${sM<0?'neg':'pos'}">${nOk?pct(sM/sR):'—'}</b></div><div class="kpi">Margem negativa<b class="neg">${nNeg}</b></div>`;
   $('pB').innerHTML=rows.map(([p,r,c])=>{
     const miss=c.cmv==null||c.pf==null;
     const inp=(f,pct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${pct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${pct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
+    const tab=p.preco_tabela==null?null:Number(p.preco_tabela);
+    const imTxt=c.im==null?'—':`${brl(c.im)} <span class="muted">(${c.imPct==null?'—':pct(c.imPct)})</span>`;
     return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
       ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
-      <td class="n hm">${brl(p.preco_tabela==null?null:Number(p.preco_tabela))}</td>
-      <td class="n">${brl(c.cmv)}</td><td class="n" title="${c.imPct==null?'Defina imposto% na aba Estados':pct(c.imPct)+' s/ CMV'}">${brl(c.im)}</td><td class="n">${inp('frete_cif',1)}</td><td class="n">${inp('preco_final',0)}</td>
+      <td class="n hm">${brl(tab)}</td>
+      <td class="n">${brl(c.cmv)}</td>
+      <td class="n">${imTxt}</td>
+      <td class="n">${inp('frete_cif',1)}</td>
+      <td class="n">${inp('preco_f1',0)}</td>
+      <td class="n">${inp('preco_f2',0)}</td>
+      <td class="n">${inp('preco_f3',0)}</td>
+      <td class="n"><b>${brl(c.pf)}</b></td>
       <td class="n hm">${c.pf==null?pct(c.cd):brl(c.pf*c.cd)}</td><td class="n hm">${brl(c.custos)}</td>
-      <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td><td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">Nenhum produto com esses filtros.</td></tr>';
+      <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td><td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td></tr>`}).join('')||'<tr><td colspan="13" class="muted">Nenhum produto com esses filtros.</td></tr>';
   const n=Object.keys(dPre).length;$('pS').disabled=!n;$('pD').textContent=n?n+' alteração(ões) pendente(s)':'';
 }
-function editPre(el){let v=num(el.value);if(Number.isNaN(v)){toast('Valor inválido',1);el.value='';return}if(el.dataset.pct==='1')v=v==null?null:v/100;const id=el.dataset.id,f=el.dataset.f,r=PRE.find(x=>x.id===id);const o=r[f]==null?null:Number(r[f]);const k=id+'|'+f;if(o===v)delete dPre[k];else dPre[k]=v;renderPre()}
+function editPre(el){let v=num(el.value);if(Number.isNaN(v)){toast('Valor inválido',1);el.value='';return}if(el.dataset.pct==='1')v=v==null?null:v/100;const id=el.dataset.id,f=el.dataset.f,r=PRE.find(x=>x.id===id);const o=r[f]==null?null:Number(r[f]);const k=id+'|'+f;if(o===v)delete dPre[k];else dPre[k]=v;if(['preco_f1','preco_f2','preco_f3'].includes(f)){const ord=Number($('pFaixa').value||1);if(faixaKey(ord)===f){dPre[id+'|preco_final']=v}}renderPre()}
+function aplicarTabela(){
+  const uf=$('pUf').value,ord=Number($('pFaixa').value||1),fk=faixaKey(ord);let n=0;
+  for(const p of PROD){const r=preRow(uf,p.id);if(!r||p.preco_tabela==null)continue;const tab=Number(p.preco_tabela);const cur=val(r,fk);if(cur===tab)continue;dPre[r.id+'|'+fk]=tab;if(ord===1)dPre[r.id+'|preco_final']=tab;n++}
+  toast(n?`Preço tabela aplicado em ${n} produto(s) na faixa ${ord} (salve)`:'Nada a aplicar');renderPre();
+}
 async function savePrecos(){
   $('pS').disabled=true;const by={};for(const [k,v] of Object.entries(dPre)){const [id,f]=k.split('|');(by[id]=by[id]||{})[f]=v}
   let errs=0;const now=new Date().toISOString();
-  for(const [id,upd] of Object.entries(by)){upd.updated_at=now;const {error}=await sb.from('precos_estado').update(upd).eq('id',id);if(error){errs++;console.error(error)}else{Object.assign(PRE.find(x=>x.id===id),upd);F.forEach(f=>delete dPre[id+'|'+f])}}
+  for(const [id,upd] of Object.entries(by)){upd.updated_at=now;const {error}=await sb.from('precos_estado').update(upd).eq('id',id);if(error){errs++;console.error(error)}else{Object.assign(PRE.find(x=>x.id===id),upd);F.forEach(f=>delete dPre[id+'|'+f]);delete dPre[id+'|preco_final']}}
   toast(errs?errs+' erro(s) ao salvar':'Preços salvos ✔',errs);renderPre();
 }
+
 ['cmvQ','cmvF'].forEach(i=>$(i).addEventListener('input',renderCmv));
 ['estQ','estF','estIcms'].forEach(i=>$(i).addEventListener('input',renderEst));
-['pUf','pQ','pCat','pF'].forEach(i=>$(i).addEventListener('input',renderPre));
+['pUf','pQ','pCat','pF','pFaixa'].forEach(i=>$(i).addEventListener('input',renderPre));
 window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
 loadAll();
 </script>
