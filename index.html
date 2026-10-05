@@ -148,7 +148,7 @@ function renderCmv(){
   $('cmvB').innerHTML=CMV.filter(c=>{const v=cmvOf(c.chave);if(f==='miss'&&v!=null)return false;if(f==='ok'&&v==null)return false;return !q||(c.chave+' '+c.produto+' '+c.gramatura).toLowerCase().includes(q)}).map(c=>{
     const v=cmvOf(c.chave),dirty=c.chave in dCmv;
     return `<tr class="${v==null?'miss':''}"><td><b>${esc(c.chave)}</b>${v==null?' <span class="tag r">sem CMV</span>':''}</td><td>${esc(c.produto)}</td><td>${esc(c.gramatura)}</td>
-    <td class="n"><input inputmode="decimal" class="${dirty?'dirty':''}" data-k="${esc(c.chave)}" value="${fmtIn(v)}" placeholder="—" onchange="editCmv(this)"></td>
+    <td class="n"><input inputmode="decimal" class="${dirty?'dirty':''}" data-k="${esc(c.chave)}" value="${fmtIn(v)}" placeholder="—" onchange="editCmv(this)" oninput="editCmv(this)"></td>
     <td class="hm muted">${c.data_ref?new Date(c.data_ref+'T12:00').toLocaleDateString('pt-BR'):''}</td><td class="hm muted">${c.updated_at?new Date(c.updated_at).toLocaleString('pt-BR'):''}</td></tr>`}).join('');
   const n=Object.keys(dCmv).length;$('cmvS').disabled=!n;$('cmvD').textContent=n?n+' alteração(ões) pendente(s)':'';
 }
@@ -205,7 +205,7 @@ function renderPre(){
   $('pK').innerHTML=`<div class="kpi">Produtos<b>${PROD.length}</b></div><div class="kpi">Sem CMV<b class="neg">${nC}</b></div><div class="kpi">Sem preço<b class="neg">${nP}</b></div><div class="kpi">Margem média<b class="${sM<0?'neg':'pos'}">${nOk?pct(sM/sR):'—'}</b></div><div class="kpi">Margem negativa<b class="neg">${nNeg}</b></div>`;
   $('pB').innerHTML=rows.map(([p,r,c])=>{
     const miss=c.cmv==null||c.pf==null;
-    const inp=f=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
+    const inp=f=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)" oninput="editPre(this)">`;
     return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
       ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
       <td class="n hm">${brl(p.preco_tabela==null?null:Number(p.preco_tabela))}</td>
