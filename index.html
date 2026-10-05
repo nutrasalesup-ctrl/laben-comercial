@@ -97,6 +97,13 @@ tr.miss td{background:var(--miss)}
           <option value="reg:Sudeste">Sudeste</option>
           <option value="reg:Sul">Sul</option>
         </select>
+        <select id="estIcms" title="Filtrar pela alíquota ICMS (origem SP)">
+          <option value="">ICMS (todas)</option>
+          <option value="7">ICMS 7%</option>
+          <option value="12">ICMS 12%</option>
+          <option value="18">ICMS 18%</option>
+          <option value="miss">Sem ICMS preenchido</option>
+        </select>
       </div>
     </div>
     <div class="estados" id="estB"></div>
@@ -184,14 +191,20 @@ function renderEst(){
   const q=($('estQ')?.value||'').toLowerCase();
   const f=$('estF')?.value||'';
   let list=[...EST].sort((a,b)=>(ordReg.indexOf(a.regiao)-ordReg.indexOf(b.regiao))||a.uf.localeCompare(b.uf));
+  const ic=$('estIcms')?.value||'';
   list=list.filter(e=>{
     if(f==='ativa'&&!e.tabela_ativa)return false;
     if(f==='inativa'&&e.tabela_ativa)return false;
     if(f&&f.startsWith('reg:')&&e.regiao!==f.slice(4))return false;
-    return !q||(e.uf+' '+e.nome+' '+(e.regiao||'')).toLowerCase().includes(q);
+    if(ic==='miss'&&e.imposto_pct!=null)return false;
+    if(ic&&ic!=='miss'){
+      const pctN=e.imposto_pct==null?null:Math.round(Number(e.imposto_pct)*1000)/10;
+      if(pctN!==Number(ic))return false;
+    }
+    return !q||(e.uf+' '+e.nome+' '+(e.regiao||'')+' ICMS '+(e.imposto_pct==null?'':(Number(e.imposto_pct)*100)+'%')).toLowerCase().includes(q);
   });
   $('estK')&&($('estK').innerHTML=`<div class="kpi">UFs<b>${EST.length}</b></div><div class="kpi">Tabelas ativas<b class="pos">${EST.filter(e=>e.tabela_ativa).length}</b></div><div class="kpi">Origem<b>SP</b></div>`);
-  $('estB').innerHTML=list.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span> <span class="tag ${e.tabela_ativa?'g':'y'}">${e.tabela_ativa?'tabela ativa':'estrutura pronta'}</span> <span class="muted">${esc(e.regiao||'')}</span></h3>
+  $('estB').innerHTML=list.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span> <span class="tag ${e.tabela_ativa?'g':'y'}">${e.tabela_ativa?'tabela ativa':'estrutura pronta'}</span> <span class="tag ${e.imposto_pct==null?'r':'g'}">ICMS ${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</span> <span class="muted">${esc(e.regiao||'')}</span></h3>
   <label><input type="checkbox" id="e_${e.uf}_tabela_ativa" ${e.tabela_ativa?'checked':''}> Tabela ativa (pronta para uso comercial)</label>
   <label>Imposto — ICMS % sobre CMV (origem SP → ${e.uf})</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 7">
   <label>Comissão (%)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
@@ -258,7 +271,7 @@ async function savePrecos(){
   toast(errs?errs+' erro(s) ao salvar':'Preços salvos ✔',errs);renderPre();
 }
 ['cmvQ','cmvF'].forEach(i=>$(i).addEventListener('input',renderCmv));
-['estQ','estF'].forEach(i=>$(i).addEventListener('input',renderEst));
+['estQ','estF','estIcms'].forEach(i=>$(i).addEventListener('input',renderEst));
 ['pUf','pQ','pCat','pF'].forEach(i=>$(i).addEventListener('input',renderPre));
 window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
 loadAll();
