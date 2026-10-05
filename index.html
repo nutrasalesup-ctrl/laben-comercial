@@ -213,6 +213,19 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   ['cmv','estados','precos'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==b.dataset.tab));
 });
 
+async function fetchAll(table,orderBy){
+  const page=1000;let from=0,all=[],error=null;
+  while(true){
+    let q=sb.from(table).select('*');
+    if(orderBy)q=q.order(orderBy);
+    const {data,error:err}=await q.range(from,from+page-1);
+    if(err){error=err;break}
+    all=all.concat(data||[]);
+    if(!data||data.length<page)break;
+    from+=page;
+  }
+  return {data:all,error};
+}
 async function loadAll(){
   if((Object.keys(dCmv).length||Object.keys(dPre).length)&&!confirm('Há alterações não salvas. Recarregar mesmo assim?'))return;
   for(const k in dCmv)delete dCmv[k];for(const k in dPre)delete dPre[k];
@@ -220,10 +233,13 @@ async function loadAll(){
     sb.from('cmv').select('*').order('chave'),
     sb.from('estados').select('*').order('uf'),
     sb.from('produtos').select('*').eq('ativo',true),
-    sb.from('precos_estado').select('*'),
-    sb.from('faixas_estado').select('*').order('ordem')]);
+    fetchAll('precos_estado'),
+    fetchAll('faixas_estado','ordem')]);
   const e=a.error||b.error||c.error||d.error||fx.error;if(e){toast('Erro ao carregar: '+e.message,1);return}
   CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;FAIX=fx.data;
+  const expected=PROD.length*EST.length;
+  if(PRE.length<expected)toast('Preços carregados: '+PRE.length+' / '+expected+' esperados (produtos×UFs)',1);
+  else if(PRE.length)toast('Preços: '+PRE.length+' linhas (todas as UFs)');
   EST.sort((x,y)=>(y.tabela_ativa?1:0)-(x.tabela_ativa?1:0)||x.uf.localeCompare(y.uf));
   const ord=['350G','1KG','3KG','10KG','20KG','250G','300G','450G'];
   const ok=k=>{const [s,g]=(k||'|').split('|');return ord.indexOf((g||'').toUpperCase())*100+['AVELA','LEITE','LALA','PISTACHE','CHOCOLATE','AMENDOBEN','MORANGO'].indexOf(s)};
