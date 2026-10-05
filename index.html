@@ -318,26 +318,32 @@ async function saveFaixaMeta(uf){
   if(error){toast('Erro: '+error.message,1);return}
   Object.assign(f,row);toast('Faixa atualizada ✔');syncFaixaSelect(uf);renderPre();
 }
-function precoFaixa(r,ord){
+function precoFaixa(r,ord,p){
   const k=faixaKey(Number(ord)||1);let v=val(r,k);
   if(v==null&&Number(ord)===1){const pf=val(r,'preco_final');if(pf!=null)return pf}
+  /* se a faixa ainda não foi preenchida, usa preço tabela do produto para conferir margem */
+  if(v==null&&p&&p.preco_tabela!=null)return Number(p.preco_tabela);
   return v;
 }
 function calc(p,r,e,ord){
-  const cmv=cmvOf(p.chave_cmv);let frPct=val(r,'frete_cif');if(frPct==null&&e.frete_pct!=null)frPct=Number(e.frete_pct);const pf=precoFaixa(r,ord);
+  const cmv=cmvOf(p.chave_cmv);let frPct=val(r,'frete_cif');if(frPct==null&&e.frete_pct!=null)frPct=Number(e.frete_pct);const pf=precoFaixa(r,ord,p);
   const imPct=e.imposto_pct==null?null:Number(e.imposto_pct);
   const pisPct=e.pis_pct==null?null:Number(e.pis_pct);
   const cofPct=e.cofins_pct==null?null:Number(e.cofins_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
-  /* por dentro: TODOS os % (ICMS, PIS, COFINS, frete, comissão, degustação) sobre o preço de venda */
+  /* por dentro: TODOS os % sobre o preço de venda (nunca sobre CMV) */
   const icms=pf!=null&&imPct!=null?pf*imPct:null;
   const pis=pf!=null&&pisPct!=null?pf*pisPct:null;
   const cof=pf!=null&&cofPct!=null?pf*cofPct:null;
-  const im=(icms||0)+(pis||0)+(cof||0);
+  const hasImp=icms!=null||pis!=null||cof!=null;
+  const im=hasImp?(icms||0)+(pis||0)+(cof||0):null;
   const fr=pf!=null&&frPct!=null?pf*frPct:null;
-  if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,custos:null,m:null,mp:null};
-  const vv=pf*cd,custos=cmv+im+(fr||0)+vv,m=pf-custos;
-  return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null};
+  if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false};
+  const vv=pf*cd;
+  const custos=cmv+(im||0)+(fr||0)+vv;
+  const m=pf-custos;
+  const fromTabela=val(r,faixaKey(Number(ord)||1))==null&&val(r,'preco_final')==null&&p.preco_tabela!=null;
+  return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null,fromTabela};
 }
 function renderPre(){
   const uf=$('pUf').value;const e=EST.find(x=>x.uf===uf);if(!e)return;
@@ -358,7 +364,7 @@ function renderPre(){
     const miss=c.cmv==null||c.pf==null;
     const inp=(f,pct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${pct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${pct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
     const tab=p.preco_tabela==null?null:Number(p.preco_tabela);
-    const imTxt=c.pf==null?'—':`${brl(c.im)} <span class="muted" title="ICMS ${c.imPct==null?'—':pct(c.imPct)} · PIS ${c.pisPct==null?'—':pct(c.pisPct)} · COFINS ${c.cofPct==null?'—':pct(c.cofPct)}">(ICMS ${brl(c.icms)} · PIS ${brl(c.pis)} · COFINS ${brl(c.cof)})</span>`;
+    const imTxt=c.im==null?'—':`${brl(c.im)}<br><span class="muted" style="font-size:11px">ICMS ${brl(c.icms)} · PIS ${brl(c.pis)} · COF ${brl(c.cof)}</span>`;
     const frInp=(()=>{const raw=val(r,'frete_cif');const eff=raw!=null?raw:(e.frete_pct==null?null:Number(e.frete_pct));const dirty=(r.id+'|frete_cif') in dPre;return `<input inputmode="decimal" data-id="${r.id}" data-f="frete_cif" data-pct="1" class="${dirty?'dirty':''}" value="${eff==null?'':fmtIn(eff*100)}" placeholder="${e.frete_pct==null?'—':fmtIn(Number(e.frete_pct)*100)+' (UF)'}" title="${raw==null&&e.frete_pct!=null?'Herdado do estado — edite para sobrescrever':'Frete do produto'}%" onchange="editPre(this)">`})();
     return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
       ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
@@ -370,7 +376,7 @@ function renderPre(){
       <td class="n">${inp('preco_f1',0)}</td>
       <td class="n">${inp('preco_f2',0)}</td>
       <td class="n">${inp('preco_f3',0)}</td>
-      <td class="n"><b>${brl(c.pf)}</b></td>
+      <td class="n"><b>${brl(c.pf)}</b>${c.fromTabela?'<br><span class="tag y">via tabela</span>':''}</td>
       <td class="n hm">${c.pf==null?pct(c.cd):brl(c.pf*c.cd)}</td><td class="n hm">${brl(c.custos)}</td>
       <td class="n ${c.m==null?'':c.m<0?'neg':'pos'}">${brl(c.m)}</td><td class="n ${c.mp==null?'':c.mp<0?'neg':'pos'}">${pct(c.mp)}</td></tr>`}).join('')||'<tr><td colspan="14" class="muted">Nenhum produto com esses filtros.</td></tr>';
   const n=Object.keys(dPre).length;$('pS').disabled=!n;$('pD').textContent=n?n+' alteração(ões) pendente(s)':'';
