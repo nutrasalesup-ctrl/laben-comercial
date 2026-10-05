@@ -237,14 +237,36 @@ function renderEst(){
   $('estB').innerHTML=list.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span> <span class="tag ${e.tabela_ativa?'g':'y'}">${e.tabela_ativa?'tabela ativa':'estrutura pronta'}</span> <span class="tag ${e.imposto_pct==null?'r':'g'}">ICMS ${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</span> <span class="muted">${esc(e.regiao||'')}</span></h3>
   <label><input type="checkbox" id="e_${e.uf}_tabela_ativa" ${e.tabela_ativa?'checked':''}> Tabela ativa (pronta para uso comercial)</label>
   <label>Imposto — ICMS % sobre CMV (origem SP → ${e.uf})</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 7">
-  <label>Frete CIF padrão (% sobre preço final)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8">
+  <label>Frete CIF padrão (% sobre preço final)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Salve a UF ou use “Fixar frete na tabela de preços” para gravar em todos os produtos desse estado.</span>
   <label>Comissão (%)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
   <label>Degustação (%)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
   <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
   <label>Lead time (dias)</label><input id="e_${e.uf}_lead_time" value="${esc(e.lead_time||'')}" placeholder="ex.: 15-18">
   <label>Pedido mínimo (R$)</label><input inputmode="decimal" id="e_${e.uf}_pedido_minimo" value="${e.pedido_minimo==null?'':fmtIn(e.pedido_minimo)}">
   <p class="muted" style="margin:10px 0 0">B2B contribuinte · impostos R$ = CMV × ICMS%. Ative a tabela quando frete/preços estiverem preenchidos.</p>
-  <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center"><span class="muted">${e.updated_at?'Atualizado '+new Date(e.updated_at).toLocaleString('pt-BR'):''}</span><button class="btn" onclick="saveEst('${e.uf}')">Salvar ${e.uf}</button></div></div>`).join('')||'<div class="card muted">Nenhum estado com esse filtro.</div>';
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center"><span class="muted" style="margin-right:auto">${e.updated_at?'Atualizado '+new Date(e.updated_at).toLocaleString('pt-BR'):''}</span>
+  <button class="btn sec" type="button" onclick="fixarFreteUf('${e.uf}')">Fixar frete na tabela de preços</button>
+  <button class="btn" onclick="saveEst('${e.uf}')">Salvar ${e.uf}</button></div></div>`).join('')||'<div class="card muted">Nenhum estado com esse filtro.</div>';
+}
+
+async function fixarFreteUf(uf){
+  const el=$(`e_${uf}_frete_pct`);
+  let fr=num(el?el.value:'');
+  if(Number.isNaN(fr)){toast('Frete % inválido',1);return}
+  if(fr==null){toast('Informe o frete % do estado antes de fixar',1);return}
+  fr=fr/100;
+  const now=new Date().toISOString();
+  const {error}=await sb.from('estados').update({frete_pct:fr,updated_at:now}).eq('uf',uf);
+  if(error){toast('Erro ao salvar frete: '+error.message,1);return}
+  const est=EST.find(e=>e.uf===uf);if(est){est.frete_pct=fr;est.updated_at=now}
+  let n=0,errs=0;
+  const rows=PRE.filter(r=>r.uf===uf);
+  for(const r of rows){
+    const {error:e2}=await sb.from('precos_estado').update({frete_cif:fr,updated_at:now}).eq('id',r.id);
+    if(e2){errs++;console.error(e2)}else{r.frete_cif=fr;r.updated_at=now;n++;delete dPre[r.id+'|frete_cif']}
+  }
+  toast(errs?`Frete salvo no estado; ${errs} erro(s) nos produtos`:`Frete ${pct(fr)} fixado em ${uf}: ${n} produto(s) na tabela de preços ✔`,errs);
+  renderEst();renderPre();
 }
 async function saveEst(uf){
   const g=f=>$(`e_${uf}_${f}`).value;
