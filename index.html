@@ -59,14 +59,14 @@ tr.miss td{background:var(--miss)}
 </header>
 <main>
   <div class="card formula">
-    <b>Formação industrial por dentro (sem markup):</b><br>
-    <code>ICMS R$ = preço de venda × ICMS% do estado</code><br>
-    <code>frete R$ = preço de venda × frete%</code><br>
-    <code>com.+degust. R$ = preço de venda × (comissão% + degustação%)</code><br>
-    <code>custos = CMV + ICMS + frete + com.+degust.</code><br>
-    <code>margem R$ = preço − custos &nbsp;|&nbsp; margem % = margem ÷ preço</code><br>
-    <code>equivalente: margem = preço × (1 − ICMS% − frete% − com% − deg%) − CMV</code><br>
-    <span class="muted">Origem SP · B2B contribuinte · imposto e frete sobre o preço (por dentro), nunca markup sobre o CMV. Ative a tabela na aba Estados quando for operar.</span>
+    <b>Formação industrial por dentro (sem markup) — todos os custos % sobre o preço:</b><br>
+    <code>ICMS R$ = preço × ICMS%</code><br>
+    <code>PIS R$ = preço × PIS% (Lucro Real 1,65%)</code><br>
+    <code>COFINS R$ = preço × COFINS% (Lucro Real 7,6%)</code><br>
+    <code>frete R$ = preço × frete% &nbsp;|&nbsp; com.+degust. R$ = preço × (com% + deg%)</code><br>
+    <code>custos = CMV + ICMS + PIS + COFINS + frete + com.+degust.</code><br>
+    <code>margem = preço − custos &nbsp;=&nbsp; preço × (1 − ICMS% − PIS% − COFINS% − frete% − com% − deg%) − CMV</code><br>
+    <span class="muted">Origem SP · Nutríssima Lucro Real · B2B contribuinte. Nada de markup sobre CMV — só cálculo por dentro.</span>
   </div>
 
   <!-- CMV -->
@@ -137,7 +137,7 @@ tr.miss td{background:var(--miss)}
       <div class="muted" id="pEst" style="margin-bottom:8px"></div>
       <div id="faixaEdit" class="muted" style="margin-bottom:10px"></div>
       <div class="tw"><table><thead><tr>
-        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">ICMS R$</th><th class="n">Frete %</th><th class="n">Frete R$</th>
+        <th>Produto</th><th class="n hm">Tabela</th><th class="n">CMV</th><th class="n">Impostos R$</th><th class="n">Frete %</th><th class="n">Frete R$</th>
         <th class="n">Faixa 1</th><th class="n">Faixa 2</th><th class="n">Faixa 3</th>
         <th class="n">Preço (faixa)</th><th class="n hm">Com.+Degust.</th><th class="n hm">Custos</th><th class="n">Margem R$</th><th class="n">Margem %</th>
       </tr></thead><tbody id="pB"></tbody></table></div>
@@ -235,16 +235,18 @@ function renderEst(){
     return !q||(e.uf+' '+e.nome+' '+(e.regiao||'')+' ICMS '+(e.imposto_pct==null?'':(Number(e.imposto_pct)*100)+'%')).toLowerCase().includes(q);
   });
   $('estK')&&($('estK').innerHTML=`<div class="kpi">UFs<b>${EST.length}</b></div><div class="kpi">Tabelas ativas<b class="pos">${EST.filter(e=>e.tabela_ativa).length}</b></div><div class="kpi">Origem<b>SP</b></div>`);
-  $('estB').innerHTML=list.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span> <span class="tag ${e.tabela_ativa?'g':'y'}">${e.tabela_ativa?'tabela ativa':'estrutura pronta'}</span> <span class="tag ${e.imposto_pct==null?'r':'g'}">ICMS ${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</span> <span class="muted">${esc(e.regiao||'')}</span></h3>
+  $('estB').innerHTML=list.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span> <span class="tag ${e.tabela_ativa?'g':'y'}">${e.tabela_ativa?'tabela ativa':'estrutura pronta'}</span> <span class="tag ${e.imposto_pct==null?'r':'g'}">ICMS ${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</span> <span class="tag g">PIS ${e.pis_pct==null?'—':pct(Number(e.pis_pct))}</span> <span class="tag g">COFINS ${e.cofins_pct==null?'—':pct(Number(e.cofins_pct))}</span> <span class="muted">${esc(e.regiao||'')}</span></h3>
   <label><input type="checkbox" id="e_${e.uf}_tabela_ativa" ${e.tabela_ativa?'checked':''}> Tabela ativa (pronta para uso comercial)</label>
   <label>ICMS % sobre preço de venda (origem SP → ${e.uf})</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 7">
-  <label>Frete CIF padrão (% sobre preço final)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Salve a UF ou use “Fixar frete na tabela de preços” para gravar em todos os produtos desse estado.</span>
-  <label>Comissão (%)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
-  <label>Degustação (%)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
+  <label>PIS % sobre preço (Lucro Real)</label><input inputmode="decimal" id="e_${e.uf}_pis_pct" value="${e.pis_pct==null?'':fmtIn(e.pis_pct*100)}" placeholder="1,65">
+  <label>COFINS % sobre preço (Lucro Real)</label><input inputmode="decimal" id="e_${e.uf}_cofins_pct" value="${e.cofins_pct==null?'':fmtIn(e.cofins_pct*100)}" placeholder="7,6">
+  <label>Frete CIF padrão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Salve a UF ou use “Fixar frete na tabela de preços” para gravar em todos os produtos desse estado.</span>
+  <label>Comissão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
+  <label>Degustação (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
   <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
   <label>Lead time (dias)</label><input id="e_${e.uf}_lead_time" value="${esc(e.lead_time||'')}" placeholder="ex.: 15-18">
   <label>Pedido mínimo (R$)</label><input inputmode="decimal" id="e_${e.uf}_pedido_minimo" value="${e.pedido_minimo==null?'':fmtIn(e.pedido_minimo)}">
-  <p class="muted" style="margin:10px 0 0">B2B contribuinte · ICMS e frete por dentro sobre o preço de venda. Ative a tabela quando frete/preços estiverem preenchidos.</p>
+  <p class="muted" style="margin:10px 0 0">B2B contribuinte · ICMS + PIS + COFINS + frete + comissão/degustação por dentro sobre o preço. Ative a tabela quando frete/preços estiverem preenchidos.</p>
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center"><span class="muted" style="margin-right:auto">${e.updated_at?'Atualizado '+new Date(e.updated_at).toLocaleString('pt-BR'):''}</span>
   <button class="btn sec" type="button" onclick="fixarFreteUf('${e.uf}')">Fixar frete na tabela de preços</button>
   <button class="btn" onclick="saveEst('${e.uf}')">Salvar ${e.uf}</button></div></div>`).join('')||'<div class="card muted">Nenhum estado com esse filtro.</div>';
@@ -271,9 +273,9 @@ async function fixarFreteUf(uf){
 }
 async function saveEst(uf){
   const g=f=>$(`e_${uf}_${f}`).value;
-  const c=num(g('comissao_pct')),d=num(g('degustacao_pct')),im=num(g('imposto_pct')),fr=num(g('frete_pct')),pm=num(g('pedido_minimo'));
-  if([c,d,im,fr,pm].some(Number.isNaN)){toast('Valor numérico inválido',1);return}
-  const row={comissao_pct:c==null?null:c/100,degustacao_pct:d==null?null:d/100,imposto_pct:im==null?null:im/100,frete_pct:fr==null?null:fr/100,prazo_pgto:g('prazo_pgto').trim()||null,lead_time:g('lead_time').trim()||null,pedido_minimo:pm,tabela_ativa:!!$('e_'+uf+'_tabela_ativa')?.checked,updated_at:new Date().toISOString()};
+  const c=num(g('comissao_pct')),d=num(g('degustacao_pct')),im=num(g('imposto_pct')),pis=num(g('pis_pct')),cof=num(g('cofins_pct')),fr=num(g('frete_pct')),pm=num(g('pedido_minimo'));
+  if([c,d,im,pis,cof,fr,pm].some(Number.isNaN)){toast('Valor numérico inválido',1);return}
+  const row={comissao_pct:c==null?null:c/100,degustacao_pct:d==null?null:d/100,imposto_pct:im==null?null:im/100,pis_pct:pis==null?null:pis/100,cofins_pct:cof==null?null:cof/100,frete_pct:fr==null?null:fr/100,prazo_pgto:g('prazo_pgto').trim()||null,lead_time:g('lead_time').trim()||null,pedido_minimo:pm,tabela_ativa:!!$('e_'+uf+'_tabela_ativa')?.checked,updated_at:new Date().toISOString()};
   const {error}=await sb.from('estados').update(row).eq('uf',uf);
   if(error){toast('Erro: '+error.message,1);return}
   Object.assign(EST.find(e=>e.uf===uf),row);toast(uf+' salvo ✔');renderEst();renderPre();
@@ -324,19 +326,24 @@ function precoFaixa(r,ord){
 function calc(p,r,e,ord){
   const cmv=cmvOf(p.chave_cmv);let frPct=val(r,'frete_cif');if(frPct==null&&e.frete_pct!=null)frPct=Number(e.frete_pct);const pf=precoFaixa(r,ord);
   const imPct=e.imposto_pct==null?null:Number(e.imposto_pct);
+  const pisPct=e.pis_pct==null?null:Number(e.pis_pct);
+  const cofPct=e.cofins_pct==null?null:Number(e.cofins_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
-  /* por dentro: ICMS e frete sobre o preço de venda, nunca sobre o CMV */
-  const im=pf!=null&&imPct!=null?pf*imPct:null;
+  /* por dentro: TODOS os % (ICMS, PIS, COFINS, frete, comissão, degustação) sobre o preço de venda */
+  const icms=pf!=null&&imPct!=null?pf*imPct:null;
+  const pis=pf!=null&&pisPct!=null?pf*pisPct:null;
+  const cof=pf!=null&&cofPct!=null?pf*cofPct:null;
+  const im=(icms||0)+(pis||0)+(cof||0);
   const fr=pf!=null&&frPct!=null?pf*frPct:null;
-  if(pf==null||cmv==null)return {cmv,fr,frPct,im,imPct,pf,cd,custos:null,m:null,mp:null};
-  const vv=pf*cd,custos=cmv+(im||0)+(fr||0)+vv,m=pf-custos;
-  return {cmv,fr,frPct,im,imPct,pf,cd,vv,custos,m,mp:pf?m/pf:null};
+  if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,custos:null,m:null,mp:null};
+  const vv=pf*cd,custos=cmv+im+(fr||0)+vv,m=pf-custos;
+  return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null};
 }
 function renderPre(){
   const uf=$('pUf').value;const e=EST.find(x=>x.uf===uf);if(!e)return;
   syncFaixaSelect(uf);
   const ord=Number($('pFaixa').value||1);
-  $('pEst').innerHTML=`${e.uf}: ICMS s/ preço <b>${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</b> · frete padrão <b>${e.frete_pct==null?'—':pct(Number(e.frete_pct))}</b> · comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))} · conferindo <b>faixa ${ord}</b>`;
+  $('pEst').innerHTML=`${e.uf}: ICMS <b>${e.imposto_pct==null?'—':pct(Number(e.imposto_pct))}</b> · PIS <b>${e.pis_pct==null?'—':pct(Number(e.pis_pct))}</b> · COFINS <b>${e.cofins_pct==null?'—':pct(Number(e.cofins_pct))}</b> · frete <b>${e.frete_pct==null?'—':pct(Number(e.frete_pct))}</b> · comissão <b>${pct(Number(e.comissao_pct)||0)}</b> · degustação <b>${pct(Number(e.degustacao_pct)||0)}</b> · prazo ${esc(e.prazo_pgto||'—')} · lead time ${esc(e.lead_time||'—')} · pedido mín. ${brl(e.pedido_minimo==null?null:Number(e.pedido_minimo))} · conferindo <b>faixa ${ord}</b>`;
   const q=$('pQ').value.toLowerCase(),cat=$('pCat').value,f=$('pF').value;
   let nC=0,nP=0,sM=0,sR=0,nOk=0,nNeg=0;
   const rows=[];
@@ -351,7 +358,7 @@ function renderPre(){
     const miss=c.cmv==null||c.pf==null;
     const inp=(f,pct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${pct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${pct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
     const tab=p.preco_tabela==null?null:Number(p.preco_tabela);
-    const imTxt=c.im==null?'—':`${brl(c.im)} <span class="muted">(${c.imPct==null?'—':pct(c.imPct)})</span>`;
+    const imTxt=c.pf==null?'—':`${brl(c.im)} <span class="muted" title="ICMS ${c.imPct==null?'—':pct(c.imPct)} · PIS ${c.pisPct==null?'—':pct(c.pisPct)} · COFINS ${c.cofPct==null?'—':pct(c.cofPct)}">(ICMS ${brl(c.icms)} · PIS ${brl(c.pis)} · COFINS ${brl(c.cof)})</span>`;
     const frInp=(()=>{const raw=val(r,'frete_cif');const eff=raw!=null?raw:(e.frete_pct==null?null:Number(e.frete_pct));const dirty=(r.id+'|frete_cif') in dPre;return `<input inputmode="decimal" data-id="${r.id}" data-f="frete_cif" data-pct="1" class="${dirty?'dirty':''}" value="${eff==null?'':fmtIn(eff*100)}" placeholder="${e.frete_pct==null?'—':fmtIn(Number(e.frete_pct)*100)+' (UF)'}" title="${raw==null&&e.frete_pct!=null?'Herdado do estado — edite para sobrescrever':'Frete do produto'}%" onchange="editPre(this)">`})();
     return `<tr class="${miss?'miss':''}"><td><b>${esc(p.descricao)}</b><br><span class="muted">${p.codigo?'Cód. '+esc(p.codigo)+' · ':''}${esc(p.chave_cmv)}</span>
       ${c.cmv==null?'<span class="tag r">sem CMV</span>':''}${c.pf==null?'<span class="tag r">sem preço</span>':''}${p.obs?`<span class="tag y" title="${esc(p.obs)}">obs</span>`:''}</td>
