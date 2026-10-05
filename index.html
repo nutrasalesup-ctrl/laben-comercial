@@ -65,7 +65,7 @@ tr.miss td{background:var(--miss)}
     <code>com.+degust. R$ = preço final × (comissão% + degustação%)</code><br>
     <code>margem R$ = preço final − CMV − impostos − frete − com.+degust.</code><br>
     <code>margem % = margem R$ ÷ preço final</code><br>
-    <span class="muted">Imposto %, comissão e degustação ficam na aba Estados (por UF). CMV na aba CMV. Na aba Preços você informa frete % e preço final. Sem preço final, a margem fica em —.</span>
+    <span class="muted">Origem SP. Imposto % do estado = ICMS interestadual sobre CMV (PE/PB padrão 7% SP→Nordeste; DIFAL só se não contribuinte). Comissão/degustação na aba Estados. Frete % e preço final na aba Preços. Sem markup.</span>
   </div>
 
   <!-- CMV -->
@@ -165,7 +165,7 @@ async function saveCmv(){
 /* ---------- ESTADOS ---------- */
 function renderEst(){
   $('estB').innerHTML=EST.map(e=>`<div class="card"><h3 style="margin:0">${e.uf} · ${esc(e.nome)} <span class="tag y">${esc(e.modalidade||'')}</span></h3>
-  <label>Imposto do estado (% sobre CMV)</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 18">
+  <label>Imposto do estado — ICMS % sobre CMV (origem SP)</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 7">
   <label>Comissão (%)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
   <label>Degustação (%)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
   <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
