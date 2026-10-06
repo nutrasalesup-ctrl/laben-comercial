@@ -594,7 +594,7 @@ function renderEst(){
   <label>ICMS % sobre preço de venda (origem SP → ${e.uf})</label><input inputmode="decimal" id="e_${e.uf}_imposto_pct" value="${e.imposto_pct==null?'':fmtIn(e.imposto_pct*100)}" placeholder="ex.: 7">
   <label>PIS % sobre preço (Lucro Real)</label><input inputmode="decimal" id="e_${e.uf}_pis_pct" value="${e.pis_pct==null?'':fmtIn(e.pis_pct*100)}" placeholder="1,65">
   <label>COFINS % sobre preço (Lucro Real)</label><input inputmode="decimal" id="e_${e.uf}_cofins_pct" value="${e.cofins_pct==null?'':fmtIn(e.cofins_pct*100)}" placeholder="7,6">
-  <label>Frete CIF padrão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Salve a UF ou use “Fixar frete na tabela de preços”.</span>
+  <label>Frete CIF padrão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_frete_pct" value="${e.frete_pct==null?'':fmtIn(e.frete_pct*100)}" placeholder="ex.: 8"><span class="muted">Ao salvar a UF, o frete novo vale na tabela (produtos sem frete próprio). Use “Fixar frete” só se quiser gravar o % em cada produto.</span>
   <label>Comissão (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_comissao_pct" value="${e.comissao_pct==null?'':fmtIn(e.comissao_pct*100)}">
   <label>Degustação (% sobre preço)</label><input inputmode="decimal" id="e_${e.uf}_degustacao_pct" value="${e.degustacao_pct==null?'':fmtIn(e.degustacao_pct*100)}">
   <label>Prazo de pagamento (dias)</label><input id="e_${e.uf}_prazo_pgto" value="${esc(e.prazo_pgto||'')}" placeholder="ex.: 35/42/49">
@@ -628,10 +628,25 @@ async function saveEst(uf){
   const g=f=>$(`e_${uf}_${f}`).value;
   const c=num(g('comissao_pct')),d=num(g('degustacao_pct')),im=num(g('imposto_pct')),pis=num(g('pis_pct')),cof=num(g('cofins_pct')),fr=num(g('frete_pct')),pm=num(g('pedido_minimo'));
   if([c,d,im,pis,cof,fr,pm].some(Number.isNaN)){toast('Valor numérico inválido',1);return}
+  const est=EST.find(e=>e.uf===uf);const oldFr=est&&est.frete_pct!=null?Number(est.frete_pct):null;
   const row={comissao_pct:c==null?null:c/100,degustacao_pct:d==null?null:d/100,imposto_pct:im==null?null:im/100,pis_pct:pis==null?null:pis/100,cofins_pct:cof==null?null:cof/100,frete_pct:fr==null?null:fr/100,prazo_pgto:g('prazo_pgto').trim()||null,lead_time:g('lead_time').trim()||null,pedido_minimo:pm,tabela_ativa:!!$('e_'+uf+'_tabela_ativa')?.checked,updated_at:new Date().toISOString()};
   const {error}=await sb.from('estados').update(row).eq('uf',uf);
   if(error){toast('Erro: '+error.message,1);return}
-  Object.assign(EST.find(e=>e.uf===uf),row);toast(uf+' salvo ✔');renderEst();renderPre();
+  Object.assign(est,row);
+  /* Frete do estado: limpa overrides iguais ao frete antigo (ou nulos) para a tabela herdar o novo % */
+  const newFr=row.frete_pct;let nFr=0;
+  if(newFr!==oldFr){
+    const rows=PRE.filter(r=>r.uf===uf);
+    for(const r of rows){
+      const cur=r.frete_cif==null?null:Number(r.frete_cif);
+      const herdava=cur==null||(oldFr!=null&&Math.abs(cur-oldFr)<1e-9);
+      if(!herdava)continue;
+      const {error:e2}=await sb.from('precos_estado').update({frete_cif:null,updated_at:row.updated_at}).eq('id',r.id);
+      if(!e2){r.frete_cif=null;nFr++;delete dPre[r.id+'|frete_cif']}
+    }
+  }
+  toast(nFr?`${uf} salvo ✔ · frete herdado em ${nFr} produto(s)`:`${uf} salvo ✔`);
+  renderEst();renderPre();if(typeof renderNeg==='function')renderNeg();
 }
 
 /* ---------- PREÇOS (modelo por dentro — NÃO alterar) ---------- */
