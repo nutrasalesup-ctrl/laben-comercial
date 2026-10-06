@@ -232,7 +232,7 @@ tr.miss td{background:#fff8f7}
         </label>
         <div class="seg" id="pLinhaSeg"></div>
         <span class="spacer"></span>
-        <span class="flab" id="pFaixaLab">Faixa</span>
+        <span class="flab" id="pFaixaLab">Pedido mínimo</span>
         <div class="seg sm" id="pFaixa"></div>
       </div>
       <div class="tools t2" id="pEmbBar">
@@ -596,7 +596,7 @@ function syncFaixaSelect(uf){
   if(!list.some(f=>f.ordem===FAIXA))FAIXA=list[0]?.ordem||1;
   const show=list.length>1;
   $('pFaixa').classList.toggle('hide',!show);$('pFaixaLab').classList.toggle('hide',!show);
-  $('pFaixa').innerHTML=list.map(f=>`<button type="button" data-o="${f.ordem}" class="${f.ordem===FAIXA?'on':''}" title="${esc(faixaLabel(f))}">${f.ordem===list[0].ordem?'Faixa ':''}${f.ordem}</button>`).join('');
+  $('pFaixa').innerHTML=list.map(f=>`<button type="button" data-o="${f.ordem}" class="${f.ordem===FAIXA?'on':''}" title="${esc(faixaLabel(f))}">${f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):(f.ordem===list[0].ordem?'Faixa ':'')+f.ordem}</button>`).join('');
   const f=list.find(x=>x.ordem===FAIXA)||list[0];
   $('faixaEdit').innerHTML=f?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Faixa ${f.ordem} em ${uf}:</span>
     <input style="min-width:180px" id="fx_nome" value="${esc(f.nome)}" placeholder="Nome da faixa">
