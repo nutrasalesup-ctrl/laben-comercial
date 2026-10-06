@@ -719,8 +719,8 @@ function renderPre(){
   /* cabeçalho */
   const fxs=faixasUf(UF);
   const fn=o=>{const f=fxs.find(x=>x.ordem===o);return 'F'+o+(f?'':'')};
-  $('pH').innerHTML=`<tr><th>Produto</th><th class="n">Preço</th><th class="n">Custo total</th><th class="n">Margem R$</th><th class="n">Margem %</th>${EDIT?`<th class="n ed">Frete %</th><th class="n ed">${fn(1)}</th><th class="n ed">${fn(2)}</th><th class="n ed">${fn(3)}</th>`:''}</tr>`;
-  const cols=EDIT?9:5;
+  $('pH').innerHTML=`<tr><th>Produto</th><th class="n">Preço</th><th class="n" title="Custo do produto">CMV</th><th class="n" title="ICMS + PIS + COFINS + frete + comissão + degustação, sobre o preço">Custos variáveis</th><th class="n">Margem R$</th><th class="n">Margem %</th>${EDIT?`<th class="n ed">Frete %</th><th class="n ed">${fn(1)}</th><th class="n ed">${fn(2)}</th><th class="n ed">${fn(3)}</th>`:''}</tr>`;
+  const cols=EDIT?10:6;
   /* agrupamento por linha, ordenado por gramatura */
   const groups={};rows.forEach(x=>(groups[x.ln]=groups[x.ln]||[]).push(x));
   const mRank=g=>{const i=MARCAS.findIndex(m=>g.startsWith(m[1]+' · '));return i<0?9:i};
@@ -738,7 +738,8 @@ function renderPre(){
       html+=`<tr class="row${OPEN===p.id?' sel':''}" data-pid="${p.id}">
         <td><div class="pn">${esc(nice(p.descricao))}</div><div class="ps">${esc(sub)}</div></td>
         <td class="n">${c.fromTabela?'<span class="tagt" title="Faixa sem preço — usando preço de tabela">tabela</span>':''}${c.pf==null?'<span class="pill na" title="Preço não cadastrado para este estado">sem preço</span>':`<span class="price">${brl(c.pf)}</span>`}</td>
-        <td class="n">${c.custos==null?'<span class="muted">—</span>':brl(c.custos)}</td>
+        <td class="n">${c.cmv==null?'<span class="muted">—</span>':brl(c.cmv)}${c.cmv!=null&&c.pf?`<div class="ps">${pct(c.cmv/c.pf)}</div>`:''}</td>
+        <td class="n">${c.custos==null?'<span class="muted">—</span>':brl(c.custos-c.cmv)}${c.custos!=null&&c.pf?`<div class="ps">${pct((c.custos-c.cmv)/c.pf)}</div>`:''}</td>
         <td class="n ${c.m==null?'':c.m<0?'mneg':'mpos'}">${c.m==null?'<span class="muted">—</span>':brl(c.m)}</td>
         <td class="n">${pillHtml(c)}</td>
         ${EDIT?`<td class="n ed">${frInp}</td><td class="n ed">${inp('preco_f1',0)}</td><td class="n ed">${inp('preco_f2',0)}</td><td class="n ed">${inp('preco_f3',0)}</td>`:''}
