@@ -203,6 +203,17 @@ td input.pr{width:96px}
 .nchip{display:inline-flex;align-items:center;gap:6px;background:#f5f5f7;border-radius:999px;padding:4px 10px;font-size:12px;color:var(--mut)}
 .rm{border:0;background:#f0f0f3;width:28px;height:28px;border-radius:50%;cursor:pointer;color:var(--mut);font-size:14px;line-height:28px}
 .rm:hover{background:#ffe5e5;color:var(--bad)}
+.anbox{background:#f7f7f9;border-radius:14px;padding:14px;margin-bottom:16px}
+.anbox .ht{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.anbox .ht b{font-size:13px;font-weight:600}
+.anbox .ht span{font-size:11px;color:var(--mut)}
+.ang{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}
+.ang label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--mut);font-weight:500}
+.ang input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;font-variant-numeric:tabular-nums;text-align:right;background:#fff}
+.ang input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(0,113,227,.18)}
+.ang input.dirty{border-color:#e0a100;background:var(--warn-bg)}
+.chipan{display:inline-flex;align-items:center;gap:6px;background:var(--warn-bg);color:var(--warn);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:600;margin-left:8px}
+
 td.ck{width:36px;text-align:center}
 input.ck{width:18px;height:18px;accent-color:var(--acc);cursor:pointer}
 tr.row.off{opacity:.55}
@@ -416,7 +427,7 @@ const dCmv={},dPre={};
 /* estado da tela de preços */
 let UF='PE',FAIXA=1,LINHA='',MARCA='Laben',EMB=0,EDIT=false,OPEN=null;
 /* MARCA/LINHA/EMB são compartilhados entre Preços e CMV */
-let CMVF='',TAB='precos',NUF='SP',NFAIXA=1,NEG=[];
+let CMVF='',TAB='precos',NUF='SP',NFAIXA=1,NEG=[],AN={};
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
@@ -704,8 +715,13 @@ function precoFaixa(r,ord,p){
   if(v==null&&p&&p.preco_tabela!=null)return Number(p.preco_tabela);
   return v;
 }
-function calc(p,r,e,ord,pfOv){
-  const cmv=cmvOf(p.chave_cmv);let frPct=val(r,'frete_cif');if(frPct==null&&e.frete_pct!=null)frPct=Number(e.frete_pct);const pf=pfOv!=null?Number(pfOv):precoFaixa(r,ord,p);
+function estEff(e){if(!e)return e;const o=AN[e.uf];return o?Object.assign({},e,o):e}
+function calc(p,r,e0,ord,pfOv){
+  const e=estEff(e0);const an=AN[e.uf]||{};
+  const cmv=cmvOf(p.chave_cmv);
+  let frPct=an.frete_pct!=null?Number(an.frete_pct):val(r,'frete_cif');
+  if(frPct==null&&e.frete_pct!=null)frPct=Number(e.frete_pct);
+  const pf=pfOv!=null?Number(pfOv):precoFaixa(r,ord,p);
   const imPct=e.imposto_pct==null?null:Number(e.imposto_pct);
   const pisPct=e.pis_pct==null?null:Number(e.pis_pct);
   const cofPct=e.cofins_pct==null?null:Number(e.cofins_pct);
@@ -856,15 +872,46 @@ async function savePrecos(){
 }
 function toggleEdit(){EDIT=!EDIT;document.body.classList.toggle('editing',EDIT);$('pEditBtn').classList.toggle('on',EDIT);$('pEditBtn').textContent=EDIT?'Concluir edição':'Editar preços';$('pEditPanel').classList.toggle('hide',!EDIT);renderPre()}
 
+
+function anVal(uf,f){const o=AN[uf];return o&&o[f]!=null?Number(o[f]):null}
+function anSet(uf,f,raw){
+  let v=num(raw);
+  if(Number.isNaN(v)){toast('Valor inválido',1);renderDrawer();return}
+  if(!AN[uf])AN[uf]={};
+  if(v==null){delete AN[uf][f];if(!Object.keys(AN[uf]).length)delete AN[uf]}
+  else AN[uf][f]=v/100;
+  renderDrawer();renderPre();if(TAB==='negociacao')renderNeg();
+}
+function anClear(uf){delete AN[uf];toast('Percentuais de análise limpos');renderDrawer();renderPre();if(TAB==='negociacao')renderNeg()}
+function anIn(uf,f,base){
+  const ov=anVal(uf,f);const cur=ov!=null?ov:(base==null?null:Number(base));
+  const dirty=ov!=null;
+  return `<input inputmode="decimal" class="${dirty?'dirty':''}" value="${cur==null?'':fmtIn(cur*100)}" placeholder="—" onchange="anSet('${uf}','${f}',this.value)">`;
+}
+
 /* ---------- composição do preço (drawer) ---------- */
 function renderDrawer(){
-  const p=PROD.find(x=>x.id===OPEN);const e=EST.find(x=>x.uf===UF);
-  const r=p&&preRow(UF,p.id);if(!p||!e||!r){closeAll();return}
-  const c=calc(p,r,e,FAIXA);
+  const p=PROD.find(x=>x.id===OPEN);const e0=EST.find(x=>x.uf===UF);
+  const r=p&&preRow(UF,p.id);if(!p||!e0||!r){closeAll();return}
+  const e=estEff(e0);
+  const c=calc(p,r,e0,FAIXA);
   const fx=faixasUf(UF).find(x=>x.ordem===FAIXA);
-  $('dHead').innerHTML=`<div class="k">${esc(marcaNome(marcaOf(p)))} · ${esc(linhaOf(p))}${embOf(p)?' · '+esc(embName(embOf(p))):''}</div><h3>${esc(nice(p.descricao))}</h3><div class="k">${esc(e.nome)} · Faixa ${FAIXA}${fx?' — '+esc(fx.nome.replace(/^Faixa \d+\s*—\s*/,'')):''}</div>`;
+  const anOn=!!AN[UF]&&Object.keys(AN[UF]).length;
+  $('dHead').innerHTML=`<div class="k">${esc(marcaNome(marcaOf(p)))} · ${esc(linhaOf(p))}${embOf(p)?' · '+esc(embName(embOf(p))):''}</div><h3>${esc(nice(p.descricao))}</h3><div class="k">${esc(e0.nome)} · Faixa ${FAIXA}${fx?' — '+esc(fx.nome.replace(/^Faixa \d+\s*—\s*/,'')):''}${anOn?' <span class="chipan">análise</span>':''}</div>`;
+  const anBox=`<div class="anbox">
+      <div class="ht"><div><b>Percentuais da análise</b><br><span>Só nesta sessão · não altera o cadastro do estado</span></div>
+        <button class="btn sec tiny" type="button" onclick="anClear('${UF}')">Resetar</button></div>
+      <div class="ang">
+        <label>ICMS %${anIn(UF,'imposto_pct',e0.imposto_pct)}</label>
+        <label>PIS %${anIn(UF,'pis_pct',e0.pis_pct)}</label>
+        <label>COFINS %${anIn(UF,'cofins_pct',e0.cofins_pct)}</label>
+        <label>Frete %${anIn(UF,'frete_pct',e0.frete_pct)}</label>
+        <label>Comissão %${anIn(UF,'comissao_pct',e0.comissao_pct)}</label>
+        <label>Degustação %${anIn(UF,'degustacao_pct',e0.degustacao_pct)}</label>
+      </div>
+    </div>`;
   if(c.pf==null||c.cmv==null){
-    $('dBody').innerHTML=`<div class="warnbox">Sem dados suficientes para calcular a margem: ${c.pf==null?'falta o <b>preço</b>':''}${c.pf==null&&c.cmv==null?' e ':''}${c.cmv==null?'falta o <b>CMV</b> ('+esc(p.chave_cmv)+')':''}.</div>
+    $('dBody').innerHTML=anBox+`<div class="warnbox">Sem dados suficientes para calcular a margem: ${c.pf==null?'falta o <b>preço</b>':''}${c.pf==null&&c.cmv==null?' e ':''}${c.cmv==null?'falta o <b>CMV</b> ('+esc(p.chave_cmv)+')':''}.</div>
     <div class="meta">Preço: <b>${brl(c.pf)}</b><br>CMV: <b>${brl(c.cmv)}</b><br>Cadastre o CMV na aba <b>CMV</b> ou o preço em <b>Editar preços</b>.</div>`;
     return;
   }
@@ -874,8 +921,9 @@ function renderDrawer(){
   const leg=segs.map(s=>`<span style="--c:var(${s[2]})">${s[0]} ${pct(s[1]/pf)}</span>`).join('');
   const line=(lab,p_,v,col)=>`<tr class="minus"><td><i style="--c:var(${col})"></i>− ${lab}</td><td class="p">${p_==null?'—':pct0(p_)}</td><td class="v">${v==null?'—':'− '+brl(v)}</td></tr>`;
   const mk=mClass(c);
-  const frSrc=val(r,'frete_cif')!=null?'do produto':(e.frete_pct!=null?'do estado':'não definido');
+  const frSrc=anVal(UF,'frete_pct')!=null?'análise':(val(r,'frete_cif')!=null?'do produto':(e0.frete_pct!=null?'do estado':'não definido'));
   $('dBody').innerHTML=`
+    ${anBox}
     <div class="big"><div><div class="muted">Preço de venda</div><div class="v">${brl(pf)}</div></div><div style="text-align:right"><div class="muted">Margem</div><span class="pill ${mk}" style="font-size:15px;padding:5px 12px">${pct(c.mp)}</span></div></div>
     ${c.m<0?`<div class="warnbox" style="background:var(--bad-bg);color:var(--bad)">Os custos superam o preço em ${brl(-c.m)} por unidade.</div>`:''}
     <div class="stack">${bar}</div>
@@ -892,8 +940,8 @@ function renderDrawer(){
       <tr class="sub"><td>Custo total</td><td class="p">${pct(c.custos/pf)}</td><td class="v">${brl(c.custos)}</td></tr>
     </table>
     <div class="meta">
-      Fonte do preço: <b>${c.fromTabela?'preço de tabela (faixa '+FAIXA+' sem preço)':'faixa '+FAIXA+' de '+esc(e.uf)}</b><br>
-      Frete: <b>${frSrc}</b> · Comissão ${pct0(Number(e.comissao_pct)||0)} + degustação ${pct0(Number(e.degustacao_pct)||0)}<br>
+      Fonte do preço: <b>${c.fromTabela?'preço de tabela (faixa '+FAIXA+' sem preço)':'faixa '+FAIXA+' de '+esc(e0.uf)}</b><br>
+      Frete: <b>${frSrc}</b> · Comissão ${pct0(Number(e.comissao_pct)||0)} + degustação ${pct0(Number(e.degustacao_pct)||0)}${anOn?' · <b>análise ativa</b>':''}<br>
       CMV: <b>${esc(p.chave_cmv||'—')}</b>${p.codigo?' · Cód. '+esc(p.codigo):''}${p.obs?'<br>Obs.: '+esc(p.obs):''}<br>
       Todos os percentuais incidem sobre o preço de venda (por dentro).
     </div>`;
