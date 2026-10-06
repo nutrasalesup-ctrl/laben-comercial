@@ -734,9 +734,9 @@ function renderPre(){
       const sub=[embOf(p)?embName(embOf(p)):'',c.cmv==null?'sem CMV':'',c.pf==null?'sem preço':''].filter(Boolean).join(' · ');
       html+=`<tr class="row${OPEN===p.id?' sel':''}" data-pid="${p.id}">
         <td><div class="pn">${esc(nice(p.descricao))}</div><div class="ps">${esc(sub)}</div></td>
-        <td class="n">${c.fromTabela?'<span class="tagt" title="Faixa sem preço — usando preço de tabela">tabela</span>':''}<span class="price">${brl(c.pf)}</span></td>
-        <td class="n">${brl(c.custos)}</td>
-        <td class="n ${c.m==null?'':c.m<0?'mneg':'mpos'}">${brl(c.m)}</td>
+        <td class="n">${c.fromTabela?'<span class="tagt" title="Faixa sem preço — usando preço de tabela">tabela</span>':''}${c.pf==null?'<span class="pill na" title="Preço não cadastrado para este estado">sem preço</span>':`<span class="price">${brl(c.pf)}</span>`}</td>
+        <td class="n">${c.custos==null?'<span class="muted">—</span>':brl(c.custos)}</td>
+        <td class="n ${c.m==null?'':c.m<0?'mneg':'mpos'}">${c.m==null?'<span class="muted">—</span>':brl(c.m)}</td>
         <td class="n">${pillHtml(c)}</td>
         ${EDIT?`<td class="n ed">${frInp}</td><td class="n ed">${inp('preco_f1',0)}</td><td class="n ed">${inp('preco_f2',0)}</td><td class="n ed">${inp('preco_f3',0)}</td>`:''}
       </tr>`;
