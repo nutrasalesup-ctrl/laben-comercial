@@ -203,6 +203,12 @@ td input.pr{width:96px}
 .nchip{display:inline-flex;align-items:center;gap:6px;background:#f5f5f7;border-radius:999px;padding:4px 10px;font-size:12px;color:var(--mut)}
 .rm{border:0;background:#f0f0f3;width:28px;height:28px;border-radius:50%;cursor:pointer;color:var(--mut);font-size:14px;line-height:28px}
 .rm:hover{background:#ffe5e5;color:var(--bad)}
+td.ck{width:36px;text-align:center}
+input.ck{width:18px;height:18px;accent-color:var(--acc);cursor:pointer}
+tr.row.off{opacity:.55}
+tr.row.off .pn{font-weight:400}
+.btn.tiny{padding:6px 12px;font-size:12px;border-radius:8px}
+
 
 </style>
 </head>
@@ -312,9 +318,10 @@ td input.pr{width:96px}
     <div class="top">
       <div class="title">
         <h2>Negociação pontual</h2>
-        <div class="cond" id="nEst">Monte o mix, aplique o preço negociado e veja a margem do pedido.</div>
+        <div class="cond" id="nEst">Selecione os produtos como na tabela de preços, ajuste qtd e preço e veja a margem do pedido.</div>
       </div>
       <div class="topr">
+        <div class="mseg" id="nMarcaSeg" role="tablist" aria-label="Linha de produtos"></div>
         <button class="btn sec" type="button" onclick="negClear()">Limpar pedido</button>
       </div>
     </div>
@@ -325,15 +332,21 @@ td input.pr{width:96px}
     <div class="kpis" id="nK" style="margin-top:14px"></div>
     <div class="tcard">
       <div class="tools">
-        <div class="nadd">
-          <label class="search" style="width:100%">
-            <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.5" stroke="#86868b" stroke-width="1.6" fill="none"/><path d="M11 11l3.5 3.5" stroke="#86868b" stroke-width="1.6" stroke-linecap="round"/></svg>
-            <input type="search" id="nQ" placeholder="Adicionar produto ao mix (ex.: avelã 450g)" autocomplete="off">
-          </label>
-          <div class="drop" id="nDrop"></div>
-        </div>
+        <label class="search">
+          <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.5" stroke="#86868b" stroke-width="1.6" fill="none"/><path d="M11 11l3.5 3.5" stroke="#86868b" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input type="search" id="nQ" placeholder="Buscar produto (ex.: avelã 450g)" autocomplete="off">
+        </label>
+        <div class="seg" id="nLinhaSeg"></div>
         <span class="spacer"></span>
-        <span class="nchip" id="nChip">0 itens</span>
+        <span class="flab" id="nFaixaLab">Pedido mínimo</span>
+        <div class="seg sm" id="nFaixa"></div>
+      </div>
+      <div class="tools t2" id="nEmbBar">
+        <span class="flab">Embalagem</span>
+        <div class="seg sm" id="nEmbSeg"></div>
+        <span class="spacer"></span>
+        <button class="btn sec tiny" type="button" onclick="negAddFiltered()">Selecionar filtrados</button>
+        <span class="nchip" id="nChip">0 no pedido</span>
       </div>
       <div class="tscroll">
         <table>
@@ -403,7 +416,7 @@ const dCmv={},dPre={};
 /* estado da tela de preços */
 let UF='PE',FAIXA=1,LINHA='',MARCA='Laben',EMB=0,EDIT=false,OPEN=null;
 /* MARCA/LINHA/EMB são compartilhados entre Preços e CMV */
-let CMVF='',TAB='precos',NUF='SP',NEG=[];
+let CMVF='',TAB='precos',NUF='SP',NFAIXA=1,NEG=[];
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
@@ -905,13 +918,22 @@ $('cMarcaSeg').addEventListener('click',ev=>{const b=ev.target.closest('button')
 $('cLinhaSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;LINHA=b.dataset.v;renderCmv()});
 $('cEmbSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;EMB=Number(b.dataset.v)||0;renderCmv()});
 ['estQ','estF','estIcms'].forEach(i=>{$(i).addEventListener('input',renderEst);$(i).addEventListener('change',renderEst)});
+$('nUfSeg').addEventListener('click',ev=>{const b=ev.target.closest('button[data-uf]');if(!b)return;NUF=b.dataset.uf;negSave();renderNeg()});
+$('nUfOther').addEventListener('change',ev=>{if(ev.target.value){NUF=ev.target.value;negSave();renderNeg()}});
+$('nQ').addEventListener('input',renderNeg);
+$('nMarcaSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;MARCA=b.dataset.v;LINHA='';EMB=0;renderNeg()});
+$('nLinhaSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;LINHA=b.dataset.v;renderNeg()});
+$('nEmbSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;EMB=Number(b.dataset.v)||0;renderNeg()});
+$('nFaixa').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;NFAIXA=Number(b.dataset.o);negSave();renderNeg()});
+
 window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
 
 /* ===== Negociação pontual ===== */
 const NEG_KEY='laben-neg-v1';
-function negLoad(){try{const o=JSON.parse(localStorage.getItem(NEG_KEY)||'null');if(o&&Array.isArray(o.items)){NEG=o.items;if(o.uf)NUF=o.uf}}catch(e){NEG=[]}}
-function negSave(){localStorage.setItem(NEG_KEY,JSON.stringify({uf:NUF,items:NEG}))}
+function negLoad(){try{const o=JSON.parse(localStorage.getItem(NEG_KEY)||'null');if(o&&Array.isArray(o.items)){NEG=o.items;if(o.uf)NUF=o.uf;if(o.faixa)NFAIXA=Number(o.faixa)||1}}catch(e){NEG=[]}}
+function negSave(){localStorage.setItem(NEG_KEY,JSON.stringify({uf:NUF,faixa:NFAIXA,items:NEG}))}
 function negClear(){NEG=[];negSave();renderNeg();toast('Pedido limpo')}
+function negItem(pid){return NEG.find(x=>x.pid===pid)}
 function negUfBar(){
   const main=['PB','PE','SP'];
   $('nUfSeg').innerHTML=main.map(u=>{const e=EST.find(x=>x.uf===u);return `<button type="button" data-uf="${u}" class="${u===NUF?'on':''}">${u}<small>${e?e.nome.split(' ')[0]:u}</small></button>`}).join('');
@@ -919,38 +941,50 @@ function negUfBar(){
   $('nUfOther').innerHTML=`<option value="">Outros estados</option>`+others.map(e=>`<option value="${e.uf}" ${e.uf===NUF?'selected':''}>${e.uf} — ${e.nome}</option>`).join('');
   if(!main.includes(NUF))$('nUfOther').value=NUF;
 }
-function negAdd(pid){
+function negToggle(pid,on){
   const p=PROD.find(x=>x.id===pid);if(!p)return;
-  if(NEG.some(x=>x.pid===pid)){toast('Produto já está no mix');return}
-  const e=EST.find(x=>x.uf===NUF)||{};const r=preRow(NUF,pid)||{id:'tmp'};
-  const tab=precoFaixa(r,1,p);
-  NEG.push({pid,qtd:1,preco:tab});
-  negSave();$('nQ').value='';$('nDrop').classList.remove('on');renderNeg();
-  toast('Adicionado: '+nice(p.descricao));
+  if(on){
+    if(negItem(pid))return;
+    const r=preRow(NUF,pid)||{id:'tmp'};
+    const tab=precoFaixa(r,NFAIXA,p);
+    NEG.push({pid,qtd:1,preco:tab});
+  }else{
+    NEG=NEG.filter(x=>x.pid!==pid);
+  }
+  negSave();renderNeg();
 }
-function negRem(pid){NEG=NEG.filter(x=>x.pid!==pid);negSave();renderNeg()}
+function negAddFiltered(){
+  const list=negCatalog();let n=0;
+  for(const {p,tab} of list){
+    if(negItem(p.id))continue;
+    NEG.push({pid:p.id,qtd:1,preco:tab});n++;
+  }
+  negSave();renderNeg();
+  toast(n?`${n} produto(s) adicionados ao pedido`:'Todos os filtrados já estão no pedido');
+}
 function negEdit(el){
   const pid=el.dataset.pid,f=el.dataset.f;let v=num(el.value);
   if(Number.isNaN(v)||v==null){toast('Valor inválido',1);renderNeg();return}
   if(f==='qtd'&&v<=0){toast('Quantidade mínima 1',1);v=1}
   if(f==='preco'&&v<0){toast('Preço inválido',1);renderNeg();return}
-  const it=NEG.find(x=>x.pid===pid);if(!it)return;
+  const it=negItem(pid);if(!it)return;
   it[f]=f==='qtd'?Math.round(v*1000)/1000:Math.round(v*100)/100;
   negSave();renderNeg();
 }
-function negSearch(){
-  const q=($('nQ').value||'').trim();const drop=$('nDrop');
-  if(!q){drop.classList.remove('on');drop.innerHTML='';return}
-  const toks=fold(q).split(/\s+/).filter(Boolean);
-  const hits=PROD.filter(p=>p.ativo!==false&&toks.every(t=>hayOf(p).includes(t))).slice(0,12);
-  const e=EST.find(x=>x.uf===NUF)||{};
-  if(!hits.length){drop.innerHTML='<div class="empty">Nenhum produto</div>';drop.classList.add('on');return}
-  drop.innerHTML=hits.map(p=>{
-    const r=preRow(NUF,p.id)||{id:'t'};const pf=precoFaixa(r,1,p);
-    const inMix=NEG.some(x=>x.pid===p.id);
-    return `<button type="button" data-pid="${p.id}" ${inMix?'disabled style="opacity:.45"':''}><div class="pn">${esc(nice(p.descricao))}<div class="ps">${esc(marcaNome(marcaOf(p)))} · ${esc(embName(embOf(p)))}</div></div><div class="pr">${brl(pf)}</div></button>`;
-  }).join('');
-  drop.classList.add('on');
+function negCatalog(){
+  const e=EST.find(x=>x.uf===NUF);if(!e)return [];
+  const byMarca=PROD.filter(p=>!MARCA||marcaOf(p)===MARCA);
+  const byLinha=byMarca.filter(p=>!LINHA||linhaOf(p)===LINHA);
+  const qt=fold(($('nQ')&&$('nQ').value||'').trim()).split(/\s+/).filter(Boolean);
+  const out=[];
+  for(const p of byLinha){
+    const r=preRow(NUF,p.id);if(!r)continue;
+    if(EMB&&embOf(p)!==EMB)continue;
+    if(qt.length){const h=hayOf(p);if(!qt.every(t=>h.includes(t)))continue}
+    const tab=precoFaixa(r,NFAIXA,p);
+    out.push({p,r,tab});
+  }
+  return out;
 }
 function renderNeg(){
   if(!$('nK'))return;
@@ -959,59 +993,94 @@ function renderNeg(){
   if(!e){$('nK').innerHTML='';$('nB').innerHTML='';return}
   const frPct0=e.frete_pct==null?null:Number(e.frete_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
-  $('nEst').innerHTML=`${esc(e.nome)} · ICMS ${pct0(e.imposto_pct)} · PIS/COFINS ${pct0((Number(e.pis_pct)||0)+(Number(e.cofins_pct)||0))} · Frete ${pct0(frPct0)} · Com.+deg. ${pct0(cd)} · preço negociado por item`;
-  const rows=[];
+  $('nEst').innerHTML=`${esc(e.nome)} · ICMS ${pct0(e.imposto_pct)} · PIS/COFINS ${pct0((Number(e.pis_pct)||0)+(Number(e.cofins_pct)||0))} · Frete ${pct0(frPct0)} · Com.+deg. ${pct0(cd)} · marque os itens do mix`;
+
+  const inUf=PROD.filter(p=>preRow(NUF,p.id));
+  $('nMarcaSeg').innerHTML=marcaSegHtml(m=>inUf.filter(p=>marcaOf(p)===m).length,inUf.length,'produto');
+  const byMarca=PROD.filter(p=>!MARCA||marcaOf(p)===MARCA);
+  const linhas=[...new Set(byMarca.map(linhaOf))].sort((a,b)=>linhaRank(a)-linhaRank(b)||a.localeCompare(b,'pt-BR'));
+  if(LINHA&&!linhas.includes(LINHA))LINHA='';
+  $('nLinhaSeg').innerHTML=[['','Todas'],...linhas.map(l=>[l,l])].map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${v===LINHA?'on':''}">${esc(l)}</button>`).join('');
+  $('nLinhaSeg').classList.toggle('hide',!linhas.length);
+  const byLinha=byMarca.filter(p=>!LINHA||linhaOf(p)===LINHA);
+  const embs=[...new Set(byLinha.map(embOf))].filter(Boolean).sort((a,b)=>a-b);
+  if(EMB&&!embs.includes(EMB))EMB=0;
+  const embCt=g=>byLinha.filter(p=>embOf(p)===g&&preRow(NUF,p.id)).length;
+  $('nEmbSeg').innerHTML=[[0,'Todas'],...embs.map(g=>[g,embName(g)])].map(([v,l])=>`<button type="button" data-v="${v}" class="${v===EMB?'on':''}">${esc(l)}${v?`<span class="ct">${embCt(v)}</span>`:''}</button>`).join('');
+  $('nEmbBar').classList.toggle('hide',false);
+
+  const list=faixasUf(NUF);
+  if(list.length&&!list.some(f=>f.ordem===NFAIXA))NFAIXA=list[0].ordem;
+  const show=list.length>1;
+  $('nFaixa').classList.toggle('hide',!show);$('nFaixaLab').classList.toggle('hide',!show);
+  $('nFaixa').innerHTML=list.map(f=>`<button type="button" data-o="${f.ordem}" class="${f.ordem===NFAIXA?'on':''}" title="${esc(faixaLabel(f))}">${f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):(f.ordem===list[0].ordem?'Faixa ':'')+f.ordem}</button>`).join('');
+
+  const catalog=negCatalog();
+  /* KPIs from selected mix (all selected, not only filtered) */
+  let rec=0,cmvT=0,varT=0,mT=0,ok=0,nSel=0;
   for(const it of NEG){
     const p=PROD.find(x=>x.id===it.pid);if(!p)continue;
     const r=preRow(NUF,p.id)||{id:'tmp_'+p.id,uf:NUF,produto_id:p.id};
-    const tab=precoFaixa(r,1,p);
-    const pf=it.preco==null?tab:Number(it.preco);
-    const c=calc(p,r,e,1,pf);
-    rows.push({it,p,r,c,tab,pf,q:Number(it.qtd)||0});
-  }
-  let rec=0,cmvT=0,varT=0,mT=0,ok=0;
-  for(const x of rows){
-    if(x.c.pf==null||x.q<=0)continue;
-    rec+=x.c.pf*x.q;
-    if(x.c.cmv!=null)cmvT+=x.c.cmv*x.q;
-    if(x.c.custos!=null&&x.c.cmv!=null)varT+=(x.c.custos-x.c.cmv)*x.q;
-    if(x.c.m!=null){mT+=x.c.m*x.q;ok++}
+    const pf=it.preco==null?precoFaixa(r,NFAIXA,p):Number(it.preco);
+    const q=Number(it.qtd)||0;const c=calc(p,r,e,NFAIXA,pf);nSel++;
+    if(c.pf==null||q<=0)continue;
+    rec+=c.pf*q;if(c.cmv!=null)cmvT+=c.cmv*q;if(c.custos!=null&&c.cmv!=null)varT+=(c.custos-c.cmv)*q;if(c.m!=null){mT+=c.m*q;ok++}
   }
   const mp=rec?mT/rec:null;
   const avgCls=mp==null?'c-mut':mp<0?'c-bad':mp<0.10?'c-warn':'c-ok';
   $('nK').innerHTML=`
-    <div class="kpi"><span>Itens no mix</span><b>${rows.length}</b><small>${ok} com margem</small></div>
+    <div class="kpi"><span>No pedido</span><b>${nSel}</b><small>${catalog.length} visíveis no filtro</small></div>
     <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>preço × quantidade</small></div>
     <div class="kpi"><span>CMV do pedido</span><b>${brl(cmvT||null)}</b><small>${rec?pct(cmvT/rec):'—'} do preço</small></div>
     <div class="kpi"><span>Custos variáveis</span><b>${brl(varT||null)}</b><small>${rec?pct(varT/rec):'—'} do preço</small></div>
     <div class="kpi"><span>Margem do pedido</span><b class="${avgCls}">${pct(mp)}</b><small>${brl(mT||null)}</small></div>`;
   $('nK').style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
-  $('nChip').textContent=rows.length+' ite'+(rows.length===1?'m':'ns')+(rec?` · ${brl(rec)}`:'');
-  $('nH').innerHTML=`<tr><th>Produto</th><th class="n">Qtd</th><th class="n">Tabela</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Margem %</th><th></th></tr>`;
-  if(!rows.length){
-    $('nB').innerHTML=`<tr><td colspan="9" class="empty"><b>Pedido vazio</b>Busque um produto acima e monte o mix da negociação.</td></tr>`;
+  $('nChip').textContent=nSel+' no pedido'+(rec?` · ${brl(rec)}`:'');
+
+  $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Margem %</th></tr>`;
+
+  if(!catalog.length){
+    $('nB').innerHTML=`<tr><td colspan="9" class="empty"><b>Nenhum produto neste filtro</b>Ajuste marca, linha, embalagem ou busca.</td></tr>`;
     return;
   }
+
+  const groups={};
+  for(const x of catalog){
+    const mk=marcaOf(x.p),ln=linhaOf(x.p);
+    const g=MARCA?ln:marcaNome(mk)+' · '+ln;
+    (groups[g]=groups[g]||[]).push(x);
+  }
+  const gKeys=Object.keys(groups).sort((a,b)=>{
+    const ra=linhaRank(a.includes(' · ')?a.split(' · ').pop():a),rb=linhaRank(b.includes(' · ')?b.split(' · ').pop():b);
+    return ra-rb||a.localeCompare(b,'pt-BR');
+  });
   let html='';
-  for(const x of rows){
-    const c=x.c;const desc=nice(x.p.descricao);
-    const delta=x.tab!=null&&x.pf!=null?x.pf-x.tab:null;
-    const dLab=delta==null?'':(delta===0?'igual à tabela':(delta<0?pct(delta/x.tab)+' vs tabela':'+'+pct(delta/x.tab)+' vs tabela'));
-    html+=`<tr class="row">
-      <td><div class="pn">${esc(desc)}</div><div class="ps">${esc(marcaNome(marcaOf(x.p)))} · ${esc(embName(embOf(x.p)))}${dLab?' · '+esc(dLab):''}</div></td>
-      <td class="n"><input class="q" inputmode="decimal" data-pid="${x.it.pid}" data-f="qtd" value="${fmtIn(x.q)}" onchange="negEdit(this)"></td>
-      <td class="n"><span class="muted">${brl(x.tab)}</span></td>
-      <td class="n"><input class="pr" inputmode="decimal" data-pid="${x.it.pid}" data-f="preco" value="${fmtIn(x.pf)}" onchange="negEdit(this)"></td>
-      <td class="n">${c.cmv==null?'—':brl(c.cmv)}</td>
-      <td class="n">${c.custos==null||c.cmv==null?'—':brl(c.custos-c.cmv)}</td>
-      <td class="n ${c.m==null?'':c.m<0?'mneg':'mpos'}">${brl(c.m)}</td>
-      <td class="n">${pillHtml(c)}</td>
-      <td class="n"><button class="rm" type="button" title="Remover" onclick="negRem('${x.it.pid}')">×</button></td>
-    </tr>`;
+  for(const g of gKeys){
+    const listG=groups[g].slice().sort((a,b)=>embOf(a.p)-embOf(b.p)||nice(a.p.descricao).localeCompare(nice(b.p.descricao),'pt-BR'));
+    const selN=listG.filter(x=>negItem(x.p.id)).length;
+    html+=`<tr class="grp"><td colspan="9">${esc(g)}<span class="gm">${listG.length} produto${listG.length>1?'s':''}${selN?` · <b>${selN} no pedido</b>`:''}</span></td></tr>`;
+    for(const x of listG){
+      const it=negItem(x.p.id);const on=!!it;
+      const pf=on?(it.preco==null?x.tab:Number(it.preco)):x.tab;
+      const q=on?(Number(it.qtd)||0):0;
+      const c=on?calc(x.p,x.r,e,NFAIXA,pf):calc(x.p,x.r,e,NFAIXA,x.tab);
+      const delta=on&&x.tab!=null&&pf!=null?pf-x.tab:null;
+      const dLab=delta==null||!on?'':(delta===0?'igual à tabela':(delta<0?pct(delta/x.tab)+' vs tabela':'+'+pct(delta/x.tab)+' vs tabela'));
+      html+=`<tr class="row${on?'':' off'}" data-pid="${x.p.id}">
+        <td class="ck"><input class="ck" type="checkbox" ${on?'checked':''} data-pid="${x.p.id}" onchange="negToggle(this.dataset.pid,this.checked)"></td>
+        <td><div class="pn">${esc(nice(x.p.descricao))}</div><div class="ps">${esc(embName(embOf(x.p)))}${dLab?' · '+esc(dLab):''}</div></td>
+        <td class="n"><span class="muted">${brl(x.tab)}</span></td>
+        <td class="n">${on?`<input class="q" inputmode="decimal" data-pid="${x.p.id}" data-f="qtd" value="${fmtIn(q||1)}" onchange="negEdit(this)">`:'<span class="muted">—</span>'}</td>
+        <td class="n">${on?`<input class="pr" inputmode="decimal" data-pid="${x.p.id}" data-f="preco" value="${fmtIn(pf)}" onchange="negEdit(this)">`:'<span class="muted">—</span>'}</td>
+        <td class="n">${!on||c.cmv==null?'—':brl(c.cmv)}</td>
+        <td class="n">${!on||c.custos==null||c.cmv==null?'—':brl(c.custos-c.cmv)}</td>
+        <td class="n ${!on||c.m==null?'':c.m<0?'mneg':'mpos'}">${on?brl(c.m):'—'}</td>
+        <td class="n">${on?pillHtml(c):'<span class="pill na">fora</span>'}</td>
+      </tr>`;
+    }
   }
   $('nB').innerHTML=html;
 }
-
 negLoad();
 loadAll();
 </script>
