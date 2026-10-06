@@ -427,7 +427,7 @@ const dCmv={},dPre={};
 /* estado da tela de preços */
 let UF='PE',FAIXA=1,LINHA='',MARCA='Laben',EMB=0,EDIT=false,OPEN=null;
 /* MARCA/LINHA/EMB são compartilhados entre Preços e CMV */
-let CMVF='',TAB='precos',NUF='SP',NFAIXA=1,NEG=[],AN={};
+let CMVF='',TAB='precos',NUF='SP',NFAIXA=1,NEG=[],AN={},ANP={};
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
@@ -798,7 +798,7 @@ function renderPre(){
     if(EMB&&embOf(p)!==EMB)continue;
     if(qt.length){const h=hayOf(p);if(!qt.every(t=>h.includes(t)))continue}
     const mk=marcaOf(p),ln=linhaOf(p);
-    rows.push({p,r,c:calc(p,r,e,ord),ln:MARCA?ln:marcaNome(mk)+' · '+ln,mk});
+    rows.push({p,r,c:calc(p,r,e,ord,anPreco(UF,p.id)),ln:MARCA?ln:marcaNome(mk)+' · '+ln,mk});
   }
   /* KPIs */
   const withData=rows.filter(x=>x.c.m!=null);
@@ -836,7 +836,7 @@ function renderPre(){
       const sub=[embOf(p)?embName(embOf(p)):'',c.cmv==null?'sem CMV':'',c.pf==null?'sem preço':''].filter(Boolean).join(' · ');
       html+=`<tr class="row${OPEN===p.id?' sel':''}" data-pid="${p.id}">
         <td><div class="pn">${esc(nice(p.descricao))}</div><div class="ps">${esc(sub)}</div></td>
-        <td class="n">${c.fromTabela?'<span class="tagt" title="Faixa sem preço — usando preço de tabela">tabela</span>':''}${c.pf==null?'<span class="pill na" title="Preço não cadastrado para este estado">sem preço</span>':`<span class="price">${brl(c.pf)}</span>`}</td>
+        <td class="n">${anPreco(UF,p.id)!=null?'<span class="tagt" title="Preço de análise (sessão)">análise</span>':(c.fromTabela?'<span class="tagt" title="Faixa sem preço — usando preço de tabela">tabela</span>':'')}${c.pf==null?'<span class="pill na" title="Preço não cadastrado para este estado">sem preço</span>':`<span class="price">${brl(c.pf)}</span>`}</td>
         <td class="n">${c.cmv==null?'<span class="muted">—</span>':brl(c.cmv)}${c.cmv!=null&&c.pf?`<div class="ps">${pct(c.cmv/c.pf)}</div>`:''}</td>
         <td class="n">${c.custos==null?'<span class="muted">—</span>':brl(c.custos-c.cmv)}${c.custos!=null&&c.pf?`<div class="ps">${pct((c.custos-c.cmv)/c.pf)}</div>`:''}</td>
         <td class="n ${c.m==null?'':c.m<0?'mneg':'mpos'}">${c.m==null?'<span class="muted">—</span>':brl(c.m)}</td>
@@ -882,26 +882,43 @@ function anSet(uf,f,raw){
   else AN[uf][f]=v/100;
   renderDrawer();renderPre();if(TAB==='negociacao')renderNeg();
 }
-function anClear(uf){delete AN[uf];toast('Percentuais de análise limpos');renderDrawer();renderPre();if(TAB==='negociacao')renderNeg()}
+function anClear(uf){delete AN[uf];anClearPrecoUf(uf);toast('Análise limpa (preço e %)');renderDrawer();renderPre();if(TAB==='negociacao')renderNeg()}
 function anIn(uf,f,base){
   const ov=anVal(uf,f);const cur=ov!=null?ov:(base==null?null:Number(base));
   const dirty=ov!=null;
   return `<input inputmode="decimal" class="${dirty?'dirty':''}" value="${cur==null?'':fmtIn(cur*100)}" placeholder="—" onchange="anSet('${uf}','${f}',this.value)">`;
 }
+function anPk(uf,pid){return uf+'|'+pid}
+function anPreco(uf,pid){const v=ANP[anPk(uf,pid)];return v==null?null:Number(v)}
+function anSetPreco(uf,pid,raw){
+  let v=num(raw);
+  if(Number.isNaN(v)){toast('Preço inválido',1);renderDrawer();return}
+  const k=anPk(uf,pid);
+  if(v==null)delete ANP[k];else ANP[k]=Math.round(v*100)/100;
+  renderDrawer();renderPre();if(TAB==='negociacao')renderNeg();
+}
+function anClearPrecoUf(uf){Object.keys(ANP).forEach(k=>{if(k.startsWith(uf+'|'))delete ANP[k]})}
+function anClearProd(uf,pid){delete ANP[anPk(uf,pid)];delete AN[uf];toast('Análise limpa');renderDrawer();renderPre();if(TAB==='negociacao')renderNeg()}
+
 
 /* ---------- composição do preço (drawer) ---------- */
 function renderDrawer(){
   const p=PROD.find(x=>x.id===OPEN);const e0=EST.find(x=>x.uf===UF);
   const r=p&&preRow(UF,p.id);if(!p||!e0||!r){closeAll();return}
   const e=estEff(e0);
-  const c=calc(p,r,e0,FAIXA);
+  const tab=precoFaixa(r,FAIXA,p);
+  const pfAn=anPreco(UF,p.id);
+  const c=calc(p,r,e0,FAIXA,pfAn);
   const fx=faixasUf(UF).find(x=>x.ordem===FAIXA);
-  const anOn=!!AN[UF]&&Object.keys(AN[UF]).length;
+  const anOn=(!!AN[UF]&&Object.keys(AN[UF]).length)||pfAn!=null;
   $('dHead').innerHTML=`<div class="k">${esc(marcaNome(marcaOf(p)))} · ${esc(linhaOf(p))}${embOf(p)?' · '+esc(embName(embOf(p))):''}</div><h3>${esc(nice(p.descricao))}</h3><div class="k">${esc(e0.nome)} · Faixa ${FAIXA}${fx?' — '+esc(fx.nome.replace(/^Faixa \d+\s*—\s*/,'')):''}${anOn?' <span class="chipan">análise</span>':''}</div>`;
   const anBox=`<div class="anbox">
-      <div class="ht"><div><b>Percentuais da análise</b><br><span>Só nesta sessão · não altera o cadastro do estado</span></div>
-        <button class="btn sec tiny" type="button" onclick="anClear('${UF}')">Resetar</button></div>
-      <div class="ang">
+      <div class="ht"><div><b>Análise de margem</b><br><span>Só nesta sessão · não altera cadastro nem tabela salva</span></div>
+        <button class="btn sec tiny" type="button" onclick="anClearProd('${UF}','${p.id}')">Resetar</button></div>
+      <div class="ang" style="grid-template-columns:1fr">
+        <label>Preço de venda (R$)<input inputmode="decimal" class="${pfAn!=null?'dirty':''}" value="${fmtIn(pfAn!=null?pfAn:tab)}" placeholder="—" onchange="anSetPreco('${UF}','${p.id}',this.value)"></label>
+      </div>
+      <div class="ang" style="margin-top:8px">
         <label>ICMS %${anIn(UF,'imposto_pct',e0.imposto_pct)}</label>
         <label>PIS %${anIn(UF,'pis_pct',e0.pis_pct)}</label>
         <label>COFINS %${anIn(UF,'cofins_pct',e0.cofins_pct)}</label>
