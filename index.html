@@ -74,6 +74,7 @@ main{width:100%;max-width:1680px;margin:0 auto;padding:24px 28px 40px}
 .btn.tog.on{background:var(--ink);color:#fff;box-shadow:none}
 /* kpis */
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+#pK{grid-template-columns:repeat(5,minmax(0,1fr))}
 .kpi{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:16px 18px}
 .kpi span{display:block;font-size:12px;color:var(--mut);font-weight:500}
 .kpi b{display:block;font-size:30px;font-weight:600;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
@@ -181,7 +182,7 @@ tr.miss td{background:#fff8f7}
   body.editing thead th{position:static}
 }
 @media(max-width:820px){
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpis,#pK{grid-template-columns:repeat(2,minmax(0,1fr))}
   .brand small{display:none}
   header.app .in{grid-template-columns:auto 1fr auto}
   th,td{padding:10px 12px}
@@ -707,10 +708,12 @@ function renderPre(){
   const nLow=withData.filter(x=>x.c.mp>=0&&x.c.mp<0.10).length;
   const nNeg=withData.filter(x=>x.c.mp<0).length;
   const nSem=rows.length-withData.length;
+  const sC=withData.reduce((a,x)=>a+x.c.cmv,0);const cmvPct=sR?sC/sR:null;const cmvMed=withData.length?sC/withData.length:null;
   const avgCls=avg==null?'c-mut':avg<0?'c-bad':avg<0.10?'c-warn':'c-ok';
   $('pK').innerHTML=`
     <div class="kpi"><span>Produtos${MARCA?' · '+esc(marcaNome(MARCA)):''}</span><b>${rows.length}</b><small>${nSem?nSem+' sem dados':'todos com preço e CMV'}</small></div>
     <div class="kpi"><span>Margem média</span><b class="${avgCls}">${pct(avg)}</b><small>ponderada pelo preço</small></div>
+    <div class="kpi"><span>CMV médio</span><b>${pct(cmvPct)}</b><small>do preço · ${brl(cmvMed)} por unidade</small></div>
     <div class="kpi"><span>Abaixo de 10%</span><b class="${nLow?'c-warn':'c-mut'}">${nLow}</b><small>margem entre 0% e 10%</small></div>
     <div class="kpi"><span>Negativas</span><b class="${nNeg?'c-bad':'c-mut'}">${nNeg}</b><small>preço não cobre os custos</small></div>`;
   /* cabeçalho */
@@ -726,8 +729,8 @@ function renderPre(){
   let html='';
   for(const g of gk){
     const list=groups[g].sort((a,b)=>embOf(a.p)-embOf(b.p)||a.p._i-b.p._i);
-    const gd=list.filter(x=>x.c.m!=null);const gs=gd.reduce((a,x)=>a+x.c.pf,0);const gmp=gs?gd.reduce((a,x)=>a+x.c.m,0)/gs:null;
-    html+=`<tr class="grp"><td colspan="${cols}">${esc(g)}<span class="gm">${list.length} produto${list.length>1?'s':''} · margem média <span class="${gmp==null?'':gmp<0?'c-bad':gmp<0.10?'c-warn':'c-ok'}">${pct(gmp)}</span></span></td></tr>`;
+    const gd=list.filter(x=>x.c.m!=null);const gs=gd.reduce((a,x)=>a+x.c.pf,0);const gmp=gs?gd.reduce((a,x)=>a+x.c.m,0)/gs:null;const gc=gd.reduce((a,x)=>a+x.c.cmv,0);const gcp=gs?gc/gs:null;const gcm=gd.length?gc/gd.length:null;
+    html+=`<tr class="grp"><td colspan="${cols}">${esc(g)}<span class="gm">${list.length} produto${list.length>1?'s':''} · margem média <span class="${gmp==null?'':gmp<0?'c-bad':gmp<0.10?'c-warn':'c-ok'}">${pct(gmp)}</span> · CMV médio ${pct(gcp)} (${brl(gcm)})</span></td></tr>`;
     for(const {p,r,c} of list){
       const inp=(f,isPct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${isPct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${isPct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
       const frInp=(()=>{const raw=val(r,'frete_cif');const eff=raw!=null?raw:(e.frete_pct==null?null:Number(e.frete_pct));const dirty=(r.id+'|frete_cif') in dPre;return `<input inputmode="decimal" data-id="${r.id}" data-f="frete_cif" data-pct="1" class="${dirty?'dirty':''}" value="${eff==null?'':fmtIn(eff*100)}" placeholder="${e.frete_pct==null?'—':fmtIn(Number(e.frete_pct)*100)+' (UF)'}" title="${raw==null&&e.frete_pct!=null?'Herdado do estado':'Frete do produto'}" onchange="editPre(this)">`})();
