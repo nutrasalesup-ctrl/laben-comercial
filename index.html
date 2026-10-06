@@ -256,15 +256,34 @@ tr.miss td{background:#fff8f7}
 
   <!-- CMV -->
   <section id="tab-cmv" class="hide">
-    <h2 class="ptitle">CMV</h2>
-    <p class="psub">Custo da mercadoria vendida por sabor e gramatura — base de todas as margens.</p>
-    <div class="kpis small" id="cmvK"></div>
-    <div class="card">
-      <div class="bar">
-        <input type="search" id="cmvQ" placeholder="Buscar sabor ou gramatura">
-        <select id="cmvF"><option value="">Todos</option><option value="miss">Só sem CMV</option><option value="ok">Só com CMV</option></select>
+    <div class="top">
+      <div class="title">
+        <h2>CMV</h2>
+        <div class="cond">Custo da mercadoria vendida por sabor e embalagem — base de todas as margens.</div>
       </div>
-      <div class="tw"><table><thead><tr><th>Chave</th><th>Produto</th><th>Gramatura</th><th class="n">CMV (R$)</th><th>Data ref.</th><th>Atualizado</th></tr></thead><tbody id="cmvB"></tbody></table></div>
+      <div class="topr">
+        <div class="mseg" id="cMarcaSeg" role="tablist" aria-label="Linha de produtos"></div>
+      </div>
+    </div>
+    <div class="kpis small" id="cmvK" style="margin-top:14px"></div>
+    <div class="tcard">
+      <div class="tools">
+        <label class="search">
+          <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="7" cy="7" r="5.5" stroke="#86868b" stroke-width="1.6" fill="none"/><path d="M11 11l3.5 3.5" stroke="#86868b" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input type="search" id="cmvQ" placeholder="Buscar sabor ou embalagem (ex.: avelã 1 kg)" autocomplete="off">
+        </label>
+        <div class="seg" id="cLinhaSeg"></div>
+        <span class="spacer"></span>
+        <span class="flab">CMV</span>
+        <div class="seg sm" id="cmvF"></div>
+      </div>
+      <div class="tools t2" id="cEmbBar">
+        <span class="flab">Embalagem</span>
+        <div class="seg sm" id="cEmbSeg"></div>
+      </div>
+      <div class="tscroll">
+        <table><thead><tr><th>Produto</th><th>Chave</th><th>Gramatura</th><th class="n">CMV (R$)</th><th>Data ref.</th><th>Atualizado</th></tr></thead><tbody id="cmvB"></tbody></table>
+      </div>
     </div>
     <div class="savebar"><span class="muted" id="cmvD">Nenhuma alteração</span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="cmvS" disabled onclick="saveCmv()">Salvar CMV</button></div>
   </section>
@@ -327,6 +346,8 @@ let CMV=[],EST=[],PROD=[],PRE=[],FAIX=[];
 const dCmv={},dPre={};
 /* estado da tela de preços */
 let UF='PE',FAIXA=1,LINHA='',MARCA='Laben',EMB=0,EDIT=false,OPEN=null;
+/* MARCA/LINHA/EMB são compartilhados entre Preços e CMV */
+let CMVF='',TAB='precos';
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
@@ -373,8 +394,10 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 /* ---------- abas ---------- */
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
-  ['cmv','estados','precos'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==b.dataset.tab));
+  TAB=b.dataset.tab;
+  ['cmv','estados','precos'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();
 });
 
 async function fetchAll(table,orderBy){
@@ -409,21 +432,79 @@ async function loadAll(){
   PROD.sort((x,y)=>ok(x.chave_cmv)-ok(y.chave_cmv)||linhaOf(x).localeCompare(linhaOf(y))||(x.descricao||'').localeCompare(y.descricao||''));
   PROD.forEach((p,i)=>{p._i=i;delete p._hay});
   CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
+  CMV.forEach(c=>delete c._hay);
   if(!EST.some(x=>x.uf===UF))UF=(EST.find(x=>x.uf==='PE')||EST[0]||{}).uf;
   renderCmv();renderEst();renderPre();
 }
 
+/* switch de marca (Laben · com açúcar | Nutríssima · zero açúcar | Todas) — usado em Preços e CMV */
+function marcaSegHtml(countOf,total,unit){
+  const extra=[...new Set(PROD.map(marcaOf))].filter(m=>!MARCAS.some(x=>x[0]===m)).sort();
+  const mlist=[...MARCAS,...extra.map(m=>[m,m,'',''])];
+  if(MARCA&&!mlist.some(x=>x[0]===MARCA))MARCA='';
+  const pl=n=>n+' '+(n===1?unit:unit==='item'?'itens':unit+'s');
+  return mlist.map(([v,l,sub,col])=>{const n=countOf(v);return `<button type="button" role="tab" data-v="${esc(v)}" class="${v===MARCA?'on':''}" aria-selected="${v===MARCA}"><strong>${col?`<i class="dt" style="background:${col}"></i>`:''}${esc(l)}</strong><span>${esc(sub?sub+' · ':'')}${pl(n)}</span></button>`}).join('')
+    +`<button type="button" role="tab" data-v="" class="${MARCA===''?'on':''}" aria-selected="${MARCA===''}"><strong>Todas</strong><span>${pl(total)}</span></button>`;
+}
 /* ---------- CMV ---------- */
+/* cada chave do CMV (ex.: AVELA|1KG) herda marca/linha do produto via produtos.chave_cmv */
+const SEM_PROD='Sem produto cadastrado';
+function prodOfKey(k){return PROD.find(p=>p.chave_cmv===k)||null}
+function embOfKey(c){const g=(c.chave||'').split('|')[1]||c.gramatura||'';const m=String(g).match(/(\d+(?:[.,]\d+)?)\s*(KG|G)\b/i);if(!m)return 0;const n=parseFloat(m[1].replace(',','.'));return Math.round(/kg/i.test(m[2])?n*1000:n)}
+function cMarca(c){const p=prodOfKey(c.chave);return p?marcaOf(p):''}
+function cLinha(c){const p=prodOfKey(c.chave);return p?linhaOf(p):SEM_PROD}
+function cHay(c){
+  if(c._hay)return c._hay;
+  const p=prodOfKey(c.chave),g=embOfKey(c);
+  c._hay=fold([c.chave,c.chave.replace(/[_|]/g,' '),c.produto,c.gramatura,embName(g),embName(g).replace(' ',''),p?hayOf(p):''].join(' '));
+  return c._hay;
+}
 function cmvOf(chave){if(chave in dCmv)return dCmv[chave];const r=CMV.find(c=>c.chave===chave);return r?r.cmv==null?null:Number(r.cmv):null}
 function renderCmv(){
-  const q=$('cmvQ').value.toLowerCase(),f=$('cmvF').value;
-  const miss=CMV.filter(c=>cmvOf(c.chave)==null).length;
-  $('cmvK').innerHTML=`<div class="kpi"><span>Chaves</span><b>${CMV.length}</b></div><div class="kpi"><span>Com CMV</span><b class="c-ok">${CMV.length-miss}</b></div><div class="kpi"><span>Sem CMV</span><b class="${miss?'c-bad':'c-mut'}">${miss}</b></div>`;
-  $('cmvB').innerHTML=CMV.filter(c=>{const v=cmvOf(c.chave);if(f==='miss'&&v!=null)return false;if(f==='ok'&&v==null)return false;return !q||(c.chave+' '+c.produto+' '+c.gramatura).toLowerCase().includes(q)}).map(c=>{
-    const v=cmvOf(c.chave),dirty=c.chave in dCmv;
-    return `<tr class="${v==null?'miss':''}"><td><b>${esc(c.chave)}</b>${v==null?' <span class="tag r">sem CMV</span>':''}</td><td>${esc(c.produto)}</td><td>${esc(c.gramatura)}</td>
+  /* 1) marca (estado compartilhado com Preços) */
+  $('cMarcaSeg').innerHTML=marcaSegHtml(m=>CMV.filter(c=>cMarca(c)===m).length,CMV.length,'item');
+  const byMarca=CMV.filter(c=>!MARCA||cMarca(c)===MARCA);
+  /* 2) linhas da marca */
+  const linhas=[...new Set(byMarca.map(cLinha))].sort((a,b)=>(a===SEM_PROD)-(b===SEM_PROD)||linhaRank(a)-linhaRank(b)||a.localeCompare(b,'pt-BR'));
+  if(LINHA&&!linhas.includes(LINHA))LINHA='';
+  $('cLinhaSeg').innerHTML=[['','Todas'],...linhas.map(l=>[l,l])].map(([v,l])=>`<button type="button" data-v="${esc(v)}" class="${v===LINHA?'on':''}">${esc(l)}</button>`).join('');
+  $('cLinhaSeg').classList.toggle('hide',!linhas.length);
+  /* 3) embalagem pela chave (1,01 kg = 1 kg) */
+  const byLinha=byMarca.filter(c=>!LINHA||cLinha(c)===LINHA);
+  const embs=[...new Set(byLinha.map(embOfKey))].filter(Boolean).sort((a,b)=>a-b);
+  if(EMB&&!embs.includes(EMB))EMB=0;
+  $('cEmbSeg').innerHTML=[[0,'Todas'],...embs.map(g=>[g,embName(g)])].map(([v,l])=>`<button type="button" data-v="${v}" class="${v===EMB?'on':''}">${esc(l)}${v?`<span class="ct">${byLinha.filter(c=>embOfKey(c)===v).length}</span>`:''}</button>`).join('');
+  $('cEmbBar').classList.toggle('hide',embs.length<2);
+  const scope=byLinha.filter(c=>!EMB||embOfKey(c)===EMB);
+  /* KPIs do recorte */
+  const miss=scope.filter(c=>cmvOf(c.chave)==null).length;
+  const lab=MARCA?' · '+esc(marcaNome(MARCA)):'';
+  $('cmvK').innerHTML=`<div class="kpi"><span>Itens${lab}</span><b>${scope.length}</b></div><div class="kpi"><span>Com CMV</span><b class="c-ok">${scope.length-miss}</b></div><div class="kpi"><span>Sem CMV</span><b class="${miss?'c-bad':'c-mut'}">${miss}</b></div>`;
+  /* filtro com/sem CMV */
+  $('cmvF').innerHTML=[['','Todos',scope.length],['miss','Sem CMV',miss],['ok','Com CMV',scope.length-miss]].map(([v,l,n])=>`<button type="button" data-v="${v}" class="${v===CMVF?'on':''}">${l}<span class="ct">${n}</span></button>`).join('');
+  const qt=fold($('cmvQ').value.trim()).split(/\s+/).filter(Boolean);
+  const rows=scope.filter(c=>{const v=cmvOf(c.chave);if(CMVF==='miss'&&v!=null)return false;if(CMVF==='ok'&&v==null)return false;if(qt.length){const h=cHay(c);if(!qt.every(t=>h.includes(t)))return false}return true});
+  /* agrupado por linha, ordenado por embalagem */
+  const gOf=c=>{const ln=cLinha(c),mk=cMarca(c);return ln===SEM_PROD||MARCA?ln:marcaNome(mk)+' · '+ln};
+  const groups={};rows.forEach(c=>(groups[gOf(c)]=groups[gOf(c)]||[]).push(c));
+  const mRank=g=>{const i=MARCAS.findIndex(m=>g.startsWith(m[1]+' · '));return g===SEM_PROD?99:i<0?9:i};
+  const lOf=g=>g.includes(' · ')?g.split(' · ').slice(1).join(' · '):g;
+  const idx=new Map(CMV.map((c,i)=>[c.chave,i]));
+  const gk=Object.keys(groups).sort((a,b)=>mRank(a)-mRank(b)||linhaRank(lOf(a))-linhaRank(lOf(b))||a.localeCompare(b,'pt-BR'));
+  let html='';
+  for(const g of gk){
+    const list=groups[g].sort((a,b)=>embOfKey(a)-embOfKey(b)||idx.get(a.chave)-idx.get(b.chave));
+    const gm=list.filter(c=>cmvOf(c.chave)==null).length;
+    html+=`<tr class="grp"><td colspan="6">${esc(g)}<span class="gm">${list.length} ite${list.length>1?'ns':'m'}${gm?` · <span class="c-bad">${gm} sem CMV</span>`:' · todos com CMV'}</span></td></tr>`;
+    for(const c of list){
+      const v=cmvOf(c.chave),dirty=c.chave in dCmv,p=prodOfKey(c.chave),g2=embOfKey(c);
+      const sub=[g2?embName(g2):'',p?'':'sem produto vinculado'].filter(Boolean).join(' · ');
+      html+=`<tr class="${v==null?'miss':''}"><td><div class="pn">${esc(nice(c.produto))}${v==null?' <span class="tag r">sem CMV</span>':''}</div><div class="ps">${esc(sub)}</div></td><td class="muted">${esc(c.chave)}</td><td>${esc(c.gramatura)}</td>
     <td class="n"><input inputmode="decimal" class="${dirty?'dirty':''}" data-k="${esc(c.chave)}" value="${fmtIn(v)}" placeholder="—" onchange="editCmv(this)"></td>
-    <td class="muted">${c.data_ref?new Date(c.data_ref+'T12:00').toLocaleDateString('pt-BR'):''}</td><td class="muted">${c.updated_at?new Date(c.updated_at).toLocaleString('pt-BR'):''}</td></tr>`}).join('');
+    <td class="muted">${c.data_ref?new Date(c.data_ref+'T12:00').toLocaleDateString('pt-BR'):''}</td><td class="muted">${c.updated_at?new Date(c.updated_at).toLocaleString('pt-BR'):''}</td></tr>`;
+    }
+  }
+  $('cmvB').innerHTML=html||`<tr><td colspan="6" class="empty"><b>Nenhum item encontrado</b>Ajuste a busca, a linha ou a embalagem.</td></tr>`;
   const n=Object.keys(dCmv).length;$('cmvS').disabled=!n;$('cmvD').textContent=n?n+' alteração(ões) pendente(s)':'Nenhuma alteração';
 }
 function editCmv(el){const v=num(el.value);if(Number.isNaN(v)){toast('Valor inválido',1);el.value='';return}const k=el.dataset.k;const orig=CMV.find(c=>c.chave===k).cmv;if((orig==null?null:Number(orig))===v)delete dCmv[k];else dCmv[k]=v;renderCmv();renderPre()}
@@ -595,11 +676,7 @@ function renderPre(){
   $('pEst').innerHTML=condLine(e);
   /* 1) marca/linha de produtos: Laben (com açúcar) · Nutríssima (zero açúcar) */
   const inUf=PROD.filter(p=>preRow(UF,p.id));
-  const extra=[...new Set(PROD.map(marcaOf))].filter(m=>!MARCAS.some(x=>x[0]===m)).sort();
-  const mlist=[...MARCAS,...extra.map(m=>[m,m,'',''])];
-  if(MARCA&&!mlist.some(x=>x[0]===MARCA))MARCA='';
-  $('pMarcaSeg').innerHTML=mlist.map(([v,l,sub,col])=>{const n=inUf.filter(p=>marcaOf(p)===v).length;return `<button type="button" role="tab" data-v="${esc(v)}" class="${v===MARCA?'on':''}" aria-selected="${v===MARCA}"><strong>${col?`<i class="dt" style="background:${col}"></i>`:''}${esc(l)}</strong><span>${esc(sub?sub+' · ':'')}${n} produto${n===1?'':'s'}</span></button>`}).join('')
-    +`<button type="button" role="tab" data-v="" class="${MARCA===''?'on':''}" aria-selected="${MARCA===''}"><strong>Todas</strong><span>${inUf.length} produtos</span></button>`;
+  $('pMarcaSeg').innerHTML=marcaSegHtml(m=>inUf.filter(p=>marcaOf(p)===m).length,inUf.length,'produto');
   const byMarca=PROD.filter(p=>!MARCA||marcaOf(p)===MARCA);
   /* 2) sub-linhas da marca escolhida */
   const linhas=[...new Set(byMarca.map(linhaOf))].sort((a,b)=>linhaRank(a)-linhaRank(b)||a.localeCompare(b,'pt-BR'));
@@ -748,7 +825,11 @@ $('pEmbSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');i
 $('pFaixa').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;FAIXA=Number(b.dataset.o);renderPre()});
 $('pQ').addEventListener('input',renderPre);
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeAll()});
-['cmvQ','cmvF'].forEach(i=>$(i).addEventListener('input',renderCmv));
+$('cmvQ').addEventListener('input',renderCmv);
+$('cmvF').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;CMVF=b.dataset.v;renderCmv()});
+$('cMarcaSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;MARCA=b.dataset.v;LINHA='';EMB=0;renderCmv()});
+$('cLinhaSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;LINHA=b.dataset.v;renderCmv()});
+$('cEmbSeg').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;EMB=Number(b.dataset.v)||0;renderCmv()});
 ['estQ','estF','estIcms'].forEach(i=>{$(i).addEventListener('input',renderEst);$(i).addEventListener('change',renderEst)});
 window.addEventListener('beforeunload',e=>{if(Object.keys(dCmv).length||Object.keys(dPre).length){e.preventDefault();e.returnValue=''}});
 loadAll();
