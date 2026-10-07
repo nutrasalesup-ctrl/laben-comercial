@@ -189,6 +189,24 @@ tr.miss td{background:#fff8f7}
   .title h2{font-size:24px}
 }
 
+/* simulador */
+.scs{display:grid;gap:14px;margin:14px 0 18px}
+.sc{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:18px;display:flex;flex-direction:column;gap:10px;border:2px solid transparent}
+.sc.best{border-color:var(--acc)}
+.sc .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sc .hd input{font:600 15px inherit;font-family:inherit;border:0;background:0;width:100%;padding:0;color:var(--txt,#1d1d1f)}
+.sc .hd .tag{font-size:11px;font-weight:600;color:#fff;background:var(--acc);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.sc .cfg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sc .cfg label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--mut);font-weight:500}
+.sc .cfg input,.sc .cfg select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;font:14px inherit;font-family:inherit;background:#fff;text-align:right;font-variant-numeric:tabular-nums}
+.sc .cfg select{text-align:left}
+.sc .cfg input,.sc .cfg select{width:100%;min-width:0;box-sizing:border-box}
+.sc .cfg>label{min-width:0}
+.sc{min-width:0}
+.sc .big{font-size:28px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.sc dl{display:grid;grid-template-columns:1fr auto;gap:6px 10px;margin:0;font-size:13px}
+.sc dt{color:var(--mut)}.sc dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
+.sc .note{font-size:11px;color:var(--mut2)}
 /* negociacao */
 .nadd{position:relative;flex:1;min-width:220px}
 .nadd .drop{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.16);max-height:320px;overflow:auto;z-index:40;display:none}
@@ -231,6 +249,7 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="precos" class="on">Preços</button>
       <button data-tab="cmv">CMV</button>
       <button data-tab="negociacao">Negociação</button>
+      <button data-tab="simulador">Simulador</button>
       <button data-tab="estados">Estados</button>
     </nav>
     <div class="hright">
@@ -323,6 +342,24 @@ tr.row.off .pn{font-weight:400}
     <div class="savebar"><span class="muted" id="cmvD">Nenhuma alteração</span><button class="btn sec" onclick="loadAll()">Recarregar</button><button class="btn" id="cmvS" disabled onclick="saveCmv()">Salvar CMV</button></div>
   </section>
 
+
+  <!-- SIMULADOR -->
+  <section id="tab-simulador" class="hide">
+    <div class="top">
+      <div class="title">
+        <h2>Simulador de campanha</h2>
+        <div class="cond" id="sEst">Mix e UF da aba Negociação · compare condições lado a lado.</div>
+      </div>
+      <div class="topr">
+        <select class="sel" id="sUf" title="Estado" onchange="NUF=this.value;negSave();renderSim()"></select>
+        <button class="btn sec" type="button" onclick="document.querySelector('#tabs [data-tab=negociacao]').click()">Montar mix</button>
+        <button class="btn sec" type="button" onclick="simAdd()" id="sAddBtn">+ Cenário</button>
+      </div>
+    </div>
+    <div class="scs" id="sC"></div>
+    <div class="cond" style="font-size:12px;margin:-6px 0 12px">Índice = margem % ÷ 10. Bonificação: receita zero, custo = CMV + ICMS + frete sobre o valor de tabela, sem PIS/COFINS. Empate = tamanho de pedido (R$) que iguala a margem R$ do Atual com aquela condição.</div>
+    <div class="tcard"><div class="tscroll"><table><thead id="sH"></thead><tbody id="sB"></tbody></table></div></div>
+  </section>
 
   <!-- NEGOCIAÇÃO -->
   <section id="tab-negociacao" class="hide">
@@ -477,9 +514,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','simulador'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();
 });
 
 async function fetchAll(table,orderBy){
@@ -516,7 +553,7 @@ async function loadAll(){
   CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
   CMV.forEach(c=>delete c._hay);
   if(!EST.some(x=>x.uf===UF))UF=(EST.find(x=>x.uf==='PE')||EST[0]||{}).uf;
-  renderCmv();renderEst();renderPre();
+  renderCmv();renderEst();renderPre();if(TAB==='simulador')renderSim();
 }
 
 /* switch de marca (Laben · com açúcar | Nutríssima · zero açúcar | Todas) — usado em Preços e CMV */
@@ -1161,6 +1198,90 @@ function renderNeg(){
     }
   }
   $('nB').innerHTML=html;
+}
+/* ===== Simulador de campanha ===== */
+const SIM_KEY='laben-sim-v1';
+let SIM=[{nome:'Black 1 · desconto',mult:1.5,alvo:null,tipo:'desc',val:10},{nome:'Black 2 · bonificação',mult:1.5,alvo:null,tipo:'bon',val:10},{nome:'Black 3 · faixa',mult:1,alvo:3000,tipo:'faixa',val:3}];
+try{const o=JSON.parse(localStorage.getItem(SIM_KEY)||'null');if(Array.isArray(o))SIM=o}catch(e){}
+function simSave(){localStorage.setItem(SIM_KEY,JSON.stringify(SIM))}
+function simAdd(){if(SIM.length>=3)return;SIM.push({nome:'Cenário '+(SIM.length+1),mult:1,alvo:null,tipo:'desc',val:5});simSave();renderSim()}
+function simDel(i){SIM.splice(i,1);simSave();renderSim()}
+function simSet(i,f,v){const s=SIM[i];if(!s)return;
+  if(f==='nome'||f==='tipo')s[f]=v;else{const n=num(v);s[f]=(v===''||n==null||Number.isNaN(n))?(f==='alvo'?null:0):n}
+  if(f==='tipo'&&v==='faixa')s.val=s.val&&s.val<=4?s.val:2;
+  simSave();renderSim()}
+function simEdit(el){const it=negItem(el.dataset.pid);if(!it)return;let v=num(el.value);
+  if(el.dataset.f==='preco'&&(el.value.trim()===''))v=null;
+  else if(v==null||Number.isNaN(v)||v<0){toast('Valor inválido',1);renderSim();return}
+  it[el.dataset.f]=v==null?null:(el.dataset.f==='qtd'?Math.round(v*1000)/1000:Math.round(v*100)/100);negSave();renderSim()}
+function simItems(){
+  const e=EST.find(x=>x.uf===NUF);if(!e)return {e:null,items:[]};
+  const vis=new Set(negCatalog().map(x=>x.p.id));const out=[];
+  for(const it of NEG){if(!vis.has(it.pid))continue;const p=PROD.find(x=>x.id===it.pid);if(!p)continue;
+    const r=preRow(NUF,p.id)||{id:'tmp_'+p.id,uf:NUF,produto_id:p.id};
+    const tab=precoFaixa(r,NFAIXA,p);const pb=it.preco==null?tab:Number(it.preco);const q=Number(it.qtd)||0;
+    if(q>0&&pb!=null)out.push({it,p,r,tab,pb,q})}
+  return {e,items:out}}
+/* um cenário: k = multiplicador de volume */
+function simRun(items,e,s){
+  const priceOf=x=>!s?x.pb:s.tipo==='desc'?x.pb*(1-(Number(s.val)||0)/100):s.tipo==='faixa'?precoFaixa(x.r,Number(s.val)||1,x.p):x.pb;
+  let rec=0,m=0,bonV=0,bonC=0,ok=true;
+  for(const x of items){const pf=priceOf(x);const c=calc(x.p,x.r,e,s&&s.tipo==='faixa'?Number(s.val):NFAIXA,pf);
+    if(c.m==null){ok=false;continue}rec+=pf*x.q;m+=c.m*x.q;
+    if(s&&s.tipo==='bon'){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*(Number(s.val)||0)/100;
+      bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}}
+  let k=s?(Number(s.mult)||1):1;
+  if(s&&s.alvo>0&&rec>0)k=s.alvo/rec;
+  return {k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok}}
+function renderSim(){
+  if(!$('sC'))return;
+  $('sUf').innerHTML=EST.slice().sort((a,b)=>a.uf.localeCompare(b.uf)).map(e=>`<option value="${e.uf}" ${e.uf===NUF?'selected':''}>${e.uf} · ${esc(e.nome)}</option>`).join('');
+  $('sAddBtn').classList.toggle('hide',SIM.length>=3);
+  const {e,items}=simItems();
+  const fx=faixasUf(NUF);const fxName=o=>{const f=fx.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
+  $('sEst').innerHTML=e?`${esc(e.nome)} · preço base: ${fxName(NFAIXA)} · ${items.length} produto${items.length===1?'':'s'} do mix da Negociação`:'Selecione um estado';
+  if(!e||!items.length){$('sC').innerHTML=`<div class="kpi" style="grid-column:1/-1"><span>Sem itens</span><b style="font-size:20px">Monte o mix na aba Negociação</b><small>Marque produtos e quantidades; eles aparecem aqui.</small></div>`;$('sH').innerHTML='';$('sB').innerHTML='';return}
+  const A=simRun(items,e,null);
+  const res=SIM.map(s=>simRun(items,e,s));
+  const all=[A,...res];const best=all.reduce((bi,x,i)=>x.m>all[bi].m?i:bi,0);
+  const sg=v=>(v>0?'+':v<0?'−':'')+brl(Math.abs(v));
+  const card=(i,s,r)=>{
+    const ip=r.rec?r.m/r.rec:null;const isA=!s;
+    const dm=r.m-A.m;const mpr=r.rec?r.m/r.rec:0;
+    const be=isA?null:(mpr>0?A.m/mpr:null);
+    const cfg=isA?`<div class="note">Pedido normal · preço base de cada item · ${fmtIn(items.reduce((a,x)=>a+x.q,0))} un.</div>`:`
+      <div class="cfg">
+        <label>Volume ×<input inputmode="decimal" value="${fmtIn(s.mult)}" onchange="simSet(${i-1},'mult',this.value)" ${s.alvo>0?'disabled':''}></label>
+        <label>ou pedido-alvo R$<input inputmode="decimal" placeholder="—" value="${s.alvo>0?fmtIn(s.alvo):''}" onchange="simSet(${i-1},'alvo',this.value)"></label>
+        <label>Condição<select onchange="simSet(${i-1},'tipo',this.value)">
+          <option value="desc" ${s.tipo==='desc'?'selected':''}>Desconto %</option>
+          <option value="bon" ${s.tipo==='bon'?'selected':''}>Bonificação %</option>
+          <option value="faixa" ${s.tipo==='faixa'?'selected':''}>Preço da faixa</option></select></label>
+        <label>${s.tipo==='faixa'?'Faixa':'%'}${s.tipo==='faixa'?`<select onchange="simSet(${i-1},'val',this.value)">${fx.map(f=>`<option value="${f.ordem}" ${Number(s.val)===f.ordem?'selected':''}>${fxName(f.ordem)}</option>`).join('')}</select>`:`<input inputmode="decimal" value="${fmtIn(s.val)}" onchange="simSet(${i-1},'val',this.value)">`}</label>
+      </div>`;
+    return `<div class="sc${i===best?' best':''}">
+      <div class="hd">${isA?'<b style="font-size:15px">Atual</b>':`<input value="${esc(s.nome||'')}" onchange="simSet(${i-1},'nome',this.value)">`}${i===best?'<span class="tag">Maior margem</span>':''}${isA?'':`<button class="rm" title="Remover" onclick="simDel(${i-1})">×</button>`}</div>
+      ${cfg}
+      <div><div class="note">Margem R$</div><div class="big ${r.m<0?'c-bad':''}">${brl(r.m)}</div></div>
+      <dl>
+        <dt>Receita</dt><dd>${brl(r.rec)}</dd>
+        <dt>Índice</dt><dd><span class="pill ${ip==null?'na':ip<0?'bad':ip<0.10?'warn':'ok'}">${idx(ip)}</span></dd>
+        ${isA?'':`<dt>Volume</dt><dd>${r.k.toLocaleString('pt-BR',{maximumFractionDigits:2})}×</dd>`}
+        ${r.bonV?`<dt>Bonificado (tabela)</dt><dd>${brl(r.bonV)}</dd><dt>Custo bonificação</dt><dd>${brl(r.bonC)}</dd>`:''}
+        ${isA?'':`<dt>vs Atual</dt><dd class="${dm<0?'c-bad':'c-ok'}">${sg(dm)}</dd>
+        <dt>Empate</dt><dd>${be==null?'não empata':brl(be)+' <span class="muted">('+(be/A.rec).toLocaleString('pt-BR',{maximumFractionDigits:2})+'×)</span>'}</dd>`}
+      </dl>
+      ${r.ok?'':'<div class="note c-warn">Itens sem CMV ou preço ficaram fora.</div>'}
+    </div>`};
+  $('sC').innerHTML=card(0,null,A)+SIM.map((s,i)=>card(i+1,s,res[i])).join('');
+  $('sC').style.gridTemplateColumns=`repeat(${1+SIM.length},minmax(0,1fr))`;
+  $('sH').innerHTML=`<tr><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Preço base</th><th class="n">Margem R$</th><th class="n">Índice</th></tr>`;
+  $('sB').innerHTML=items.map(x=>{const c=calc(x.p,x.r,e,NFAIXA,x.pb);const ov=x.it.preco!=null&&x.tab!=null&&Math.abs(x.it.preco-x.tab)>0.004;
+    return `<tr class="row"><td><div class="pn">${esc(nice(x.p.descricao))}</div><div class="ps">${esc(embName(embOf(x.p)))}${ov?' · condição especial':''}</div></td>
+    <td class="n"><span class="muted">${brl(x.tab)}</span></td>
+    <td class="n"><input class="q" inputmode="decimal" data-pid="${x.p.id}" data-f="qtd" value="${fmtIn(x.q)}" onchange="simEdit(this)"></td>
+    <td class="n"><input class="pr" inputmode="decimal" data-pid="${x.p.id}" data-f="preco" value="${fmtIn(x.pb)}" onchange="simEdit(this)" title="Vazio = preço de tabela"></td>
+    <td class="n ${c.m<0?'mneg':'mpos'}">${brl(c.m)}</td><td class="n">${pillHtml(c)}</td></tr>`}).join('');
 }
 negLoad();
 loadAll();
