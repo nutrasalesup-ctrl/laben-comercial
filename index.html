@@ -349,6 +349,7 @@ tr.row.off .pn{font-weight:400}
       <div class="title">
         <h2>Simulador de campanha</h2>
         <div class="cond" id="sEst">Mix e UF da aba Negociação · compare condições lado a lado.</div>
+        <div class="cond" style="font-size:12px;margin-top:4px">Combine em cada cartão volume, preço base, descontos e bonificação; os descontos se aplicam em sequência sobre o preço e o cartão azul é o de maior margem R$.</div>
       </div>
       <div class="topr">
         <select class="sel" id="sUf" title="Estado" onchange="NUF=this.value;negSave();renderSim()"></select>
@@ -1200,16 +1201,20 @@ function renderNeg(){
   $('nB').innerHTML=html;
 }
 /* ===== Simulador de campanha ===== */
-const SIM_KEY='laben-sim-v1';
-let SIM=[{nome:'Black 1 · desconto',mult:1.5,alvo:null,tipo:'desc',val:10},{nome:'Black 2 · bonificação',mult:1.5,alvo:null,tipo:'bon',val:10},{nome:'Black 3 · faixa',mult:1,alvo:3000,tipo:'faixa',val:3}];
-try{const o=JSON.parse(localStorage.getItem(SIM_KEY)||'null');if(Array.isArray(o))SIM=o}catch(e){}
-function simSave(){localStorage.setItem(SIM_KEY,JSON.stringify(SIM))}
-function simAdd(){if(SIM.length>=3)return;SIM.push({nome:'Cenário '+(SIM.length+1),mult:1,alvo:null,tipo:'desc',val:5});simSave();renderSim()}
+const SIM_KEY='laben-sim-v2';
+const simNew=(o)=>Object.assign({nome:'',mult:1,alvo:null,faixa:null,dc:0,dv:0,bon:0},o||{});
+let SIMA=simNew({nome:'Atual'});
+let SIM=[simNew({nome:'Cenário 1',mult:1.5,dc:10}),simNew({nome:'Cenário 2',mult:1.5,bon:10}),simNew({nome:'Cenário 3',alvo:3000,faixa:3,dv:3})];
+try{const o=JSON.parse(localStorage.getItem(SIM_KEY)||'null');if(o&&Array.isArray(o.list)){SIM=o.list.map(simNew);SIMA=simNew(o.atual)}}catch(e){}
+function simSave(){localStorage.setItem(SIM_KEY,JSON.stringify({atual:SIMA,list:SIM}))}
+function simAdd(){if(SIM.length>=3)return;SIM.push(simNew({nome:'Cenário '+(SIM.length+1)}));simSave();renderSim()}
 function simDel(i){SIM.splice(i,1);simSave();renderSim()}
-function simSet(i,f,v){const s=SIM[i];if(!s)return;
-  if(f==='nome'||f==='tipo')s[f]=v;else{const n=num(v);s[f]=(v===''||n==null||Number.isNaN(n))?(f==='alvo'?null:0):n}
-  if(f==='tipo'&&v==='faixa')s.val=s.val&&s.val<=4?s.val:2;
+function simSet(i,f,v){const s=i<0?SIMA:SIM[i];if(!s)return;
+  if(f==='nome')s.nome=v;
+  else if(f==='faixa')s.faixa=(v==='esp'||v==='cur')?v:Number(v);
+  else{const n=num(v);s[f]=(String(v).trim()===''||n==null||Number.isNaN(n))?(f==='alvo'?null:(f==='mult'?1:0)):Math.max(0,n)}
   simSave();renderSim()}
+function simAtualReset(){SIMA=simNew({nome:'Atual'});simSave();renderSim()}
 function simEdit(el){const it=negItem(el.dataset.pid);if(!it)return;let v=num(el.value);
   if(el.dataset.f==='preco'&&(el.value.trim()===''))v=null;
   else if(v==null||Number.isNaN(v)||v<0){toast('Valor inválido',1);renderSim();return}
@@ -1233,49 +1238,75 @@ function simRun(items,e,s){
   let k=s?(Number(s.mult)||1):1;
   if(s&&s.alvo>0&&rec>0)k=s.alvo/rec;
   return {k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok}}
+
+function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
+function simRun(items,e,s,hasEsp){
+  const fx=simFx(s,hasEsp);const ord=typeof fx==='number'?fx:NFAIXA;
+  const dc=(Number(s.dc)||0)/100,dv=(Number(s.dv)||0)/100,bp=(Number(s.bon)||0)/100;
+  let rec=0,m=0,bonV=0,bonC=0,tabV=0,ok=true;
+  for(const x of items){
+    const base=fx==='esp'?x.pb:fx==='cur'?x.tab:precoFaixa(x.r,fx,x.p);
+    if(base==null){ok=false;continue}
+    const pf=base*(1-dc)*(1-dv);
+    const c=calc(x.p,x.r,e,ord,pf);
+    if(c.m==null){ok=false;continue}
+    rec+=pf*x.q;m+=c.m*x.q;tabV+=(x.tab||0)*x.q;
+    if(bp>0){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*bp;bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}
+  }
+  let k=Number(s.mult)||1;if(s.alvo>0&&rec>0)k=s.alvo/rec;
+  const perc=(tabV+bonV)>0?((tabV-rec)+bonV)/(tabV+bonV):null;
+  return {k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok,fx,perc}}
 function renderSim(){
   if(!$('sC'))return;
   $('sUf').innerHTML=EST.slice().sort((a,b)=>a.uf.localeCompare(b.uf)).map(e=>`<option value="${e.uf}" ${e.uf===NUF?'selected':''}>${e.uf} · ${esc(e.nome)}</option>`).join('');
   $('sAddBtn').classList.toggle('hide',SIM.length>=3);
   const {e,items}=simItems();
-  const fx=faixasUf(NUF);const fxName=o=>{const f=fx.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
-  $('sEst').innerHTML=e?`${esc(e.nome)} · preço base: ${fxName(NFAIXA)} · ${items.length} produto${items.length===1?'':'s'} do mix da Negociação`:'Selecione um estado';
+  const fxl=faixasUf(NUF);const fxName=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
+  const fxShort=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'Faixa R$'+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
+  $('sEst').innerHTML=e?`${esc(e.nome)} · tabela atual: ${fxName(NFAIXA)} · ${items.length} produto${items.length===1?'':'s'} do mix da Negociação`:'Selecione um estado';
   if(!e||!items.length){$('sC').innerHTML=`<div class="kpi" style="grid-column:1/-1"><span>Sem itens</span><b style="font-size:20px">Monte o mix na aba Negociação</b><small>Marque produtos e quantidades; eles aparecem aqui.</small></div>`;$('sH').innerHTML='';$('sB').innerHTML='';return}
-  const A=simRun(items,e,null);
-  const res=SIM.map(s=>simRun(items,e,s));
+  const hasEsp=items.some(x=>x.it.preco!=null&&x.tab!=null&&Math.abs(x.it.preco-x.tab)>0.004);
+  const A=simRun(items,e,SIMA,hasEsp);
+  const res=SIM.map(s=>simRun(items,e,s,hasEsp));
   const all=[A,...res];const best=all.reduce((bi,x,i)=>x.m>all[bi].m?i:bi,0);
   const sg=v=>(v>0?'+':v<0?'−':'')+brl(Math.abs(v));
+  const pc=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const resumo=(s,r)=>{const p=[];
+    p.push(r.fx==='esp'?'Preço especial':r.fx==='cur'?'Tabela atual':fxShort(r.fx));
+    if(s.alvo>0)p.push('pedido '+brl(s.alvo));else if((Number(s.mult)||1)!==1)p.push(pc(s.mult)+'× volume');
+    if(s.dc>0)p.push('−'+pc(s.dc)+'%');if(s.dv>0)p.push('−'+pc(s.dv)+'% à vista');if(s.bon>0)p.push(pc(s.bon)+'% bonif.');
+    return p.join(' · ')};
   const card=(i,s,r)=>{
-    const ip=r.rec?r.m/r.rec:null;const isA=!s;
-    const dm=r.m-A.m;const mpr=r.rec?r.m/r.rec:0;
-    const be=isA?null:(mpr>0?A.m/mpr:null);
-    const cfg=isA?`<div class="note">Pedido normal · preço base de cada item · ${fmtIn(items.reduce((a,x)=>a+x.q,0))} un.</div>`:`
-      <div class="cfg">
-        <label>Volume ×<input inputmode="decimal" value="${fmtIn(s.mult)}" onchange="simSet(${i-1},'mult',this.value)" ${s.alvo>0?'disabled':''}></label>
-        <label>ou pedido-alvo R$<input inputmode="decimal" placeholder="—" value="${s.alvo>0?fmtIn(s.alvo):''}" onchange="simSet(${i-1},'alvo',this.value)"></label>
-        <label>Condição<select onchange="simSet(${i-1},'tipo',this.value)">
-          <option value="desc" ${s.tipo==='desc'?'selected':''}>Desconto %</option>
-          <option value="bon" ${s.tipo==='bon'?'selected':''}>Bonificação %</option>
-          <option value="faixa" ${s.tipo==='faixa'?'selected':''}>Preço da faixa</option></select></label>
-        <label>${s.tipo==='faixa'?'Faixa':'%'}${s.tipo==='faixa'?`<select onchange="simSet(${i-1},'val',this.value)">${fx.map(f=>`<option value="${f.ordem}" ${Number(s.val)===f.ordem?'selected':''}>${fxName(f.ordem)}</option>`).join('')}</select>`:`<input inputmode="decimal" value="${fmtIn(s.val)}" onchange="simSet(${i-1},'val',this.value)">`}</label>
+    const isA=i===0,si=i-1;const ip=r.rec?r.m/r.rec:null;
+    const dm=r.m-A.m;const mpr=r.rec?r.m/r.rec:0;const be=isA?null:(mpr>0?A.m/mpr:null);
+    const opt=(v,l)=>`<option value="${v}" ${String(r.fx)===String(v)?'selected':''}>${l}</option>`;
+    const cfg=`<div class="cfg">
+        <label>Volume ×<input inputmode="decimal" value="${fmtIn(s.mult)}" onchange="simSet(${si},'mult',this.value)" ${s.alvo>0?'disabled':''}></label>
+        <label>ou pedido-alvo R$<input inputmode="decimal" placeholder="—" value="${s.alvo>0?fmtIn(s.alvo):''}" onchange="simSet(${si},'alvo',this.value)"></label>
+        <label style="grid-column:1/-1">Preço base<select onchange="simSet(${si},'faixa',this.value)">${hasEsp?opt('esp','Preço especial'):''}${opt('cur','Tabela atual ('+fxName(NFAIXA)+')')}${fxl.map(f=>opt(f.ordem,fxName(f.ordem))).join('')}</select></label>
+        <label>Desc. comercial %<input inputmode="decimal" value="${fmtIn(s.dc)}" onchange="simSet(${si},'dc',this.value)"></label>
+        <label>Desc. à vista %<input inputmode="decimal" value="${fmtIn(s.dv)}" onchange="simSet(${si},'dv',this.value)"></label>
+        <label>Bonificação %<input inputmode="decimal" value="${fmtIn(s.bon)}" onchange="simSet(${si},'bon',this.value)"></label>
       </div>`;
     return `<div class="sc${i===best?' best':''}">
-      <div class="hd">${isA?'<b style="font-size:15px">Atual</b>':`<input value="${esc(s.nome||'')}" onchange="simSet(${i-1},'nome',this.value)">`}${i===best?'<span class="tag">Maior margem</span>':''}${isA?'':`<button class="rm" title="Remover" onclick="simDel(${i-1})">×</button>`}</div>
-      ${cfg}
+      <div class="hd"><input value="${esc(s.nome||(isA?'Atual':''))}" onchange="simSet(${si},'nome',this.value)">${i===best?'<span class="tag">Maior margem</span>':''}${isA?'':`<button class="rm" title="Remover" onclick="simDel(${si})">×</button>`}</div>
+      ${isA?`<details><summary class="note" style="cursor:pointer">Ajustar condição do Atual</summary>${cfg}<button class="btn tiny sec" style="margin-top:8px" onclick="simAtualReset()">Restaurar pedido normal</button></details>`:cfg}
       <div><div class="note">Margem R$</div><div class="big ${r.m<0?'c-bad':''}">${brl(r.m)}</div></div>
       <dl>
         <dt>Receita</dt><dd>${brl(r.rec)}</dd>
         <dt>Índice</dt><dd><span class="pill ${ip==null?'na':ip<0?'bad':ip<0.10?'warn':'ok'}">${idx(ip)}</span></dd>
-        ${isA?'':`<dt>Volume</dt><dd>${r.k.toLocaleString('pt-BR',{maximumFractionDigits:2})}×</dd>`}
+        <dt>Volume</dt><dd>${r.k.toLocaleString('pt-BR',{maximumFractionDigits:2})}×</dd>
         ${r.bonV?`<dt>Bonificado (tabela)</dt><dd>${brl(r.bonV)}</dd><dt>Custo bonificação</dt><dd>${brl(r.bonC)}</dd>`:''}
+        <dt>Desconto percebido</dt><dd>${r.perc==null?'—':pct(r.perc)}</dd>
         ${isA?'':`<dt>vs Atual</dt><dd class="${dm<0?'c-bad':'c-ok'}">${sg(dm)}</dd>
         <dt>Empate</dt><dd>${be==null?'não empata':brl(be)+' <span class="muted">('+(be/A.rec).toLocaleString('pt-BR',{maximumFractionDigits:2})+'×)</span>'}</dd>`}
       </dl>
+      <div class="note" style="border-top:1px solid var(--line);padding-top:8px">${esc(resumo(s,r))}</div>
       ${r.ok?'':'<div class="note c-warn">Itens sem CMV ou preço ficaram fora.</div>'}
     </div>`};
-  $('sC').innerHTML=card(0,null,A)+SIM.map((s,i)=>card(i+1,s,res[i])).join('');
+  $('sC').innerHTML=card(0,SIMA,A)+SIM.map((s,i)=>card(i+1,s,res[i])).join('');
   $('sC').style.gridTemplateColumns=`repeat(${1+SIM.length},minmax(0,1fr))`;
-  $('sH').innerHTML=`<tr><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Preço base</th><th class="n">Margem R$</th><th class="n">Índice</th></tr>`;
+  $('sH').innerHTML=`<tr><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Preço especial</th><th class="n">Margem R$</th><th class="n">Índice</th></tr>`;
   $('sB').innerHTML=items.map(x=>{const c=calc(x.p,x.r,e,NFAIXA,x.pb);const ov=x.it.preco!=null&&x.tab!=null&&Math.abs(x.it.preco-x.tab)>0.004;
     return `<tr class="row"><td><div class="pn">${esc(nice(x.p.descricao))}</div><div class="ps">${esc(embName(embOf(x.p)))}${ov?' · condição especial':''}</div></td>
     <td class="n"><span class="muted">${brl(x.tab)}</span></td>
