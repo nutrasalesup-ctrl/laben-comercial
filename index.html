@@ -189,6 +189,14 @@ tr.miss td{background:#fff8f7}
   .title h2{font-size:24px}
 }
 
+/* empresas */
+.empbox{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:16px 18px;margin:14px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 18px;align-items:end}
+.empbox h4{margin:0;font-size:14px;grid-column:1/-1}
+.empbox h4 small{font-weight:400;color:var(--mut);margin-left:6px}
+.empbox label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--mut);font-weight:500}
+.empbox input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:14px inherit;font-family:inherit;text-align:right;font-variant-numeric:tabular-nums}
+.empbox .note{grid-column:1/-1;font-size:12px;color:var(--mut)}
+.ufstrip .need{color:var(--bad);background:var(--bad-bg);border-radius:999px;padding:2px 10px;font-weight:600}
 /* NF-e */
 .nfbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:14px 0 0;padding:12px 16px;background:#fff;border-radius:14px;box-shadow:var(--sh);font-size:13px;color:var(--mut)}
 .nfbar b{color:#1d1d1f;font-weight:600}
@@ -274,6 +282,7 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="estados">Estados</button>
     </nav>
     <div class="hright">
+      <div class="seg sm" id="empSeg" title="Empresa emissora"></div>
       <span class="badge" title="Formação por dentro · Lucro Real · ICMS interestadual sobre o preço · sem DIFAL B2B contribuinte">✓ Modelo conferido · por dentro</span>
       <button class="link" type="button" onclick="openHow()">Como calculamos</button>
     </div>
@@ -383,7 +392,7 @@ tr.row.off .pn{font-weight:400}
     <div class="nfbar hide" id="sNf"></div>
     <div class="ufstrip" id="sUfBar"></div>
     <div class="scs" id="sC"></div>
-    <div class="cond" style="font-size:12px;margin:-6px 0 12px">Índice = margem % ÷ 10. Bonificação: receita zero, custo = CMV + ICMS + frete sobre o valor de tabela, sem PIS/COFINS. Empate = tamanho de pedido (R$) que iguala a margem R$ do Atual com aquela condição.</div>
+    <div class="cond" style="font-size:12px;margin:-6px 0 12px">Índice = margem % ÷ 10. Bonificação: receita zero, custo = CMV + ICMS (Nutríssima) ou CMV + Simples sobre bonificação (LBR) + frete sobre o valor de tabela, sem PIS/COFINS. Empate = tamanho de pedido (R$) que iguala a margem R$ do Atual com aquela condição.</div>
     <div class="tcard"><div class="tscroll"><table><thead id="sH"></thead><tbody id="sB"></tbody></table></div></div>
   </section>
 
@@ -437,6 +446,7 @@ tr.row.off .pn{font-weight:400}
   <section id="tab-estados" class="hide">
     <h2 class="ptitle">Estados</h2>
     <p class="psub">ICMS, PIS/COFINS, frete e condições comerciais por UF (origem SP).</p>
+    <div class="empbox" id="empBox"></div>
     <div class="kpis small" id="estK"></div>
     <div class="bar">
       <input type="search" id="estQ" placeholder="Buscar UF ou estado">
@@ -569,6 +579,7 @@ async function loadAll(){
     sb.from('produtos').select('*').eq('ativo',true),
     fetchAll('precos_estado','id'),
     fetchAll('faixas_estado','ordem')]);
+  {const em=await sb.from('empresas').select('*');if(!em.error)EMPRESAS=em.data||[]}
   const e=a.error||b.error||c.error||d.error||fx.error;if(e){toast('Erro ao carregar: '+e.message,1);return}
   CMV=a.data;EST=b.data;PROD=c.data;PRE=d.data;FAIX=fx.data;
   const expected=PROD.length*EST.length;
@@ -581,7 +592,7 @@ async function loadAll(){
   CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
   CMV.forEach(c=>delete c._hay);
   if(!EST.some(x=>x.uf===UF))UF=(EST.find(x=>x.uf==='PE')||EST[0]||{}).uf;
-  renderCmv();renderEst();renderPre();if(TAB==='simulador')renderSim();
+  renderEmp();renderCmv();renderEst();renderPre();if(TAB==='simulador')renderSim();
 }
 
 /* switch de marca (Laben · com açúcar | Nutríssima · zero açúcar | Todas) — usado em Preços e CMV */
@@ -782,7 +793,16 @@ function precoFaixa(r,ord,p){
   if(v==null&&p&&p.preco_tabela!=null)return Number(p.preco_tabela);
   return v;
 }
-function estEff(e){if(!e)return e;const o=AN[e.uf];return o?Object.assign({},e,o):e}
+/* ===== Empresas emissoras ===== */
+let EMP=localStorage.getItem('laben-emp')==='lbr'?'lbr':'nutrissima',EMPRESAS=[];
+const empRow=id=>EMPRESAS.find(x=>x.id===id)||null;
+const empNome=id=>(empRow(id||EMP)||{}).nome||((id||EMP)==='lbr'?'LBR':'Nutríssima');
+function lbrAliq(){const r=empRow('lbr');return r&&r.aliquota_simples!=null&&r.aliquota_simples!==''?Number(r.aliquota_simples):null}
+function lbrBonif(){const r=empRow('lbr');return r&&r.simples_bonif_pct!=null?Number(r.simples_bonif_pct)||0:0}
+function bonImp(ct){return EMP==='lbr'?lbrBonif():(ct.imPct||0)}
+/* Nutríssima: sem mudança. LBR (Simples): ICMS/PIS/COFINS = 0 e a alíquota do Simples entra no lugar do imposto por dentro */
+function estEff(e){if(!e)return e;const o=AN[e.uf];let r=o?Object.assign({},e,o):e;
+  if(EMP==='lbr')r=Object.assign({},r,{imposto_pct:lbrAliq(),pis_pct:0,cofins_pct:0});return r}
 function calc(p,r,e0,ord,pfOv){
   const e=estEff(e0);const an=AN[e.uf]||{};
   const cmv=cmvOf(p.chave_cmv);
@@ -800,6 +820,7 @@ function calc(p,r,e0,ord,pfOv){
   const hasImp=icms!=null||pis!=null||cof!=null;
   const im=hasImp?(icms||0)+(pis||0)+(cof||0):null;
   const fr=pf!=null&&frPct!=null?pf*frPct:null;
+  if(EMP==='lbr'&&lbrAliq()==null)return {cmv,fr,frPct,im:null,icms:null,pis:0,cof:0,imPct:null,pisPct:0,cofPct:0,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false,carga:null,semSimples:true};
   if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false,carga:null};
   const vv=pf*cd;
   const custos=cmv+(im||0)+(fr||0)+vv;
@@ -809,7 +830,7 @@ function calc(p,r,e0,ord,pfOv){
   return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null,fromTabela,carga};
 }
 function mClass(c){if(c.m==null||c.mp==null)return 'na';if(c.mp<0)return 'bad';if(c.mp<0.10)return 'warn';return 'ok'}
-function pillHtml(c){const k=mClass(c);return k==='na'?'<span class="pill na">sem dados</span>':`<span class="pill ${k}">${idx(c.mp)}</span>`}
+function pillHtml(c){if(c.semSimples)return '<span class="pill na" title="Informe a alíquota do Simples em Estados › Empresa">sem Simples</span>';const k=mClass(c);return k==='na'?'<span class="pill na">sem dados</span>':`<span class="pill ${k}">${idx(c.mp)}</span>`}
 
 /* seletor de estado */
 function renderUfPicker(){
@@ -825,6 +846,8 @@ function renderUfPicker(){
 }
 function condLine(e){
   const sep='<span class="sep">·</span>';
+  if(EMP==='lbr'){const a=lbrAliq();const fr0=e.frete_pct!=null?pct0(Number(e.frete_pct)):'por produto';
+    return [`<b>LBR · Simples Nacional</b>`,a==null?'<span class="c-bad">informe a alíquota do Simples</span>':`Simples <b>${pct0(a)}</b>`,'ICMS/PIS/COFINS <b>0%</b>',`Frete <b>${fr0}</b>`,`Comissão <b>${pct0(Number(e.comissao_pct)||0)}</b>`,`Degustação <b>${pct0(Number(e.degustacao_pct)||0)}</b>`].join(sep)}
   const pc=(e.pis_pct==null&&e.cofins_pct==null)?null:(Number(e.pis_pct)||0)+(Number(e.cofins_pct)||0);
   const ufRows=PRE.filter(r=>r.uf===e.uf);
   let fr;
@@ -1014,7 +1037,7 @@ function renderDrawer(){
     <div class="legend">${leg}</div>
     <table class="wf">
       <tr class="head"><td>Preço de venda${c.fromTabela?' <span class="tagt">tabela</span>':''}</td><td class="p">100%</td><td class="v">${brl(pf)}</td></tr>
-      ${line('ICMS',c.imPct,c.icms,'--c-imp')}
+      ${line(EMP==='lbr'?'Simples Nacional':'ICMS',c.imPct,c.icms,'--c-imp')}
       ${line('PIS',c.pisPct,c.pis,'--c-imp')}
       ${line('COFINS',c.cofPct,c.cof,'--c-imp')}
       ${line('Frete',c.frPct,c.fr,'--c-fr')}
@@ -1128,7 +1151,7 @@ function renderNeg(){
   $('nUfBar').innerHTML=ufStripHtml(e,NEG.map(it=>({r:preRow(NUF,it.pid)||{}})));
   const frPct0=e.frete_pct==null?null:Number(e.frete_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
-  $('nEst').innerHTML=`${esc(e.nome)} · ICMS ${pct0(e.imposto_pct)} · PIS/COFINS ${pct0((Number(e.pis_pct)||0)+(Number(e.cofins_pct)||0))} · Frete ${pct0(frPct0)} · Com.+deg. ${pct0(cd)} · marque os itens do mix`;
+  $('nEst').innerHTML=EMP==='lbr'?`${esc(e.nome)} · LBR · Simples Nacional · marque os itens do mix`:`${esc(e.nome)} · ICMS ${pct0(e.imposto_pct)} · PIS/COFINS ${pct0((Number(e.pis_pct)||0)+(Number(e.cofins_pct)||0))} · Frete ${pct0(frPct0)} · Com.+deg. ${pct0(cd)} · marque os itens do mix`;
 
   const inUf=PROD.filter(p=>preRow(NUF,p.id));
   $('nMarcaSeg').innerHTML=marcaSegHtml(m=>inUf.filter(p=>marcaOf(p)===m).length,inUf.length,'produto');
@@ -1163,7 +1186,7 @@ function renderNeg(){
     const q=Number(it.qtd)||0;const c=calc(p,r,e,NFAIXA,pf);nSel++;
     const bq=Number(it.bon)||0;
     if(bq>0){const tab=precoFaixa(r,NFAIXA,p);const ct=calc(p,r,e,NFAIXA,tab);
-      if(tab!=null&&ct.cmv!=null){bonQ+=bq;bonV+=tab*bq;bonC+=(ct.cmv+tab*(ct.imPct||0)+tab*(ct.frPct||0))*bq}}
+      if(tab!=null&&ct.cmv!=null){bonQ+=bq;bonV+=tab*bq;bonC+=(ct.cmv+tab*bonImp(ct)+tab*(ct.frPct||0))*bq}}
     if(c.pf==null||q<=0)continue;
     unT+=q;rec+=c.pf*q;if(c.cmv!=null)cmvT+=c.cmv*q;if(c.custos!=null&&c.cmv!=null)varT+=(c.custos-c.cmv)*q;if(c.m!=null){mT+=c.m*q;ok++}
   }
@@ -1177,10 +1200,10 @@ function renderNeg(){
     <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>${nSel} produto${nSel===1?'':'s'} · ${fmtIn(unT)} un.${bonQ?' + '+fmtIn(bonQ)+' bonif.':''}${nHid?` · <span title="Marcados fora do filtro atual não entram no total">${nHid} oculto${nHid>1?'s':''} no filtro</span>`:''} · <a href="#" onclick="negClear();return false" style="color:var(--mut)">limpar</a></small></div>
     <div class="kpi"><span>Valor bonificado</span><b>${brl(bonV||null)}</b><small>${bonQ?fmtIn(bonQ)+' un. a preço de tabela':'sem bonificação'}</small></div>
     <div class="kpi"><span>Desconto percebido</span><b>${bonV?pct(dp):'—'}</b><small>bonif. ÷ (receita + bonif.)</small></div>
-    <div class="kpi"><span>Custo real da bonificação</span><b>${brl(bonC||null)}</b><small>CMV + ICMS + frete</small></div>
+    <div class="kpi"><span>Custo real da bonificação</span><b>${brl(bonC||null)}</b><small>${EMP==='lbr'?'CMV + frete'+(lbrBonif()?' + Simples':''):'CMV + ICMS + frete'}</small></div>
     <div class="kpi"><span>Índice do pedido</span><b class="${cls(mp2)}">${idx(mp2)}</b><small>${bonV?`sem bonif. ${idx(mp)} · ${brl(mT)} → ${brl(mT2)} · <span style="color:var(--bad);font-weight:600">impacto ${ppf(pp)}</span>`:brl(mT||null)}</small></div>`;
   $('nK').style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
-  $('nPrem').textContent=`Bonificação: receita zero · custo = CMV + ICMS ${pct0(e.imposto_pct)} e frete sobre o preço de tabela · sem PIS/COFINS · comissão e degustação não incidem.`;
+  $('nPrem').textContent=EMP==='lbr'?`Bonificação (LBR · Simples): receita zero · custo = CMV + frete sobre o preço de tabela${lbrBonif()?' + Simples '+pct0(lbrBonif()):''} · sem ICMS/PIS/COFINS.`:`Bonificação: receita zero · custo = CMV + ICMS ${pct0(e.imposto_pct)} e frete sobre o preço de tabela · sem PIS/COFINS · comissão e degustação não incidem.`;
   $('nChip').textContent=nSel+' no pedido'+(nHid?` (+${nHid} oculto${nHid>1?'s':''})`:'')+(rec?` · ${brl(rec)}`:'');
 
   $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Qtd bonificada</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Índice</th></tr>`;
@@ -1261,11 +1284,14 @@ function simItems(){
 function ufStripHtml(e,items){
   if(!e)return '';
   const n=v=>v==null?null:Number(v);
-  const fx=[['ICMS',n(e.imposto_pct)],['PIS',n(e.pis_pct)],['COFINS',n(e.cofins_pct)],['Frete',n(e.frete_pct)],['Comissão',n(e.comissao_pct)],['Degustação',n(e.degustacao_pct)]];
+  const lbr=EMP==='lbr',al=lbrAliq();
+  const fx=lbr?[['Simples',al],['ICMS',0],['PIS',0],['COFINS',0],['Frete',n(e.frete_pct)],['Comissão',n(e.comissao_pct)],['Degustação',n(e.degustacao_pct)]]
+    :[['ICMS',n(e.imposto_pct)],['PIS',n(e.pis_pct)],['COFINS',n(e.cofins_pct)],['Frete',n(e.frete_pct)],['Comissão',n(e.comissao_pct)],['Degustação',n(e.degustacao_pct)]];
   const tot=fx.reduce((a,x)=>a+(x[1]||0),0);
   let own=0;for(const x of items||[]){const fr=val(x.r,'frete_cif');if(fr!=null&&e.frete_pct!=null&&Math.abs(fr-Number(e.frete_pct))>1e-9)own++;else if(fr!=null&&e.frete_pct==null)own++}
-  return `<span>${esc(e.uf)} · vem do cadastro do estado</span>`+fx.map(([l,v])=>`<span>${l} <b>${pct0(v)}</b></span>`).join('')+
-    `<span class="tot">Custos variáveis <b>${pct0(tot)}</b></span>`+
+  if(lbr&&al==null)return `<span><b>LBR · Simples Nacional</b> · ${esc(e.uf)}</span><span class="need">informe a alíquota do Simples</span><span>Frete <b>${pct0(n(e.frete_pct))}</b></span><span>Comissão <b>${pct0(n(e.comissao_pct))}</b></span><span>Degustação <b>${pct0(n(e.degustacao_pct))}</b></span><a href="#" onclick="document.querySelector('#tabs [data-tab=estados]').click();return false">Informar em Estados › Empresa</a>`;
+  return `<span>${lbr?'<b>LBR · Simples Nacional</b> · ':'<b>Nutríssima · Lucro Real</b> · '}${esc(e.uf)} · vem do cadastro do estado${lbr?' + empresa':''}</span>`+fx.map(([l,v])=>`<span>${l} <b>${pct0(v)}</b></span>`).join('')+
+    `<span class="tot">Custos variáveis <b>${pct0(tot)}</b></span>`+(lbr?`<span>Simples na bonif. <b>${pct0(lbrBonif())}</b></span>`:'')+
     (own?`<span class="w" title="Esses itens usam o frete do cadastro do produto nesta UF">${own} item${own>1?'s':''} com frete próprio</span>`:'')+
     `<a href="#" onclick="document.querySelector('#tabs [data-tab=estados]').click();return false">Editar em Estados ›</a>`}
 
@@ -1306,7 +1332,10 @@ function nfParse(txt){
   if(doc.getElementsByTagName('parsererror').length)throw new Error('xml');
   const inf=nfEl(doc,'infNFe');if(!inf)throw new Error('sem infNFe');
   const ide=nfEl(inf,'ide'),dest=nfEl(inf,'dest'),tot=nfEl(inf,'ICMSTot');
-  const meta={cliente:nfTxt(dest,'xNome'),cnpj:nfTxt(dest,'CNPJ')||nfTxt(dest,'CPF'),uf:nfTxt(nfEl(dest,'enderDest'),'UF'),
+  const emit=nfEl(inf,'emit');const crt=nfTxt(emit,'CRT'),ecnpj=nfTxt(emit,'CNPJ');
+  let emp=null,empPor='';const byC=EMPRESAS.find(x=>x.cnpj&&x.cnpj===ecnpj);
+  if(byC){emp=byC.id;empPor='CNPJ'}else if(crt==='1'||crt==='2'){emp='lbr';empPor='CRT '+crt+' (Simples)'}else if(crt==='3'){emp='nutrissima';empPor='CRT 3 (Normal)'}
+  const meta={emitNome:nfTxt(emit,'xNome'),emitCnpj:ecnpj,crt,emp,empPor,cliente:nfTxt(dest,'xNome'),cnpj:nfTxt(dest,'CNPJ')||nfTxt(dest,'CPF'),uf:nfTxt(nfEl(dest,'enderDest'),'UF'),
     nNF:nfTxt(ide,'nNF'),data:(nfTxt(ide,'dhEmi')||nfTxt(ide,'dEmi')).slice(0,10),
     vNF:nfNum(nfTxt(tot,'vNF')),vFrete:nfNum(nfTxt(tot,'vFrete')),vDesc:nfNum(nfTxt(tot,'vDesc')),vProd:nfNum(nfTxt(tot,'vProd'))};
   const rows=[];
@@ -1328,6 +1357,7 @@ function nfReview(){
   const hasUf=EST.some(e=>e.uf===meta.uf);
   $('nfm').innerHTML=`<h3>Conferir NF-e ${esc(meta.nNF)}</h3>
     <p><b>${esc(meta.cliente||'—')}</b> · ${esc(nfFmtDoc(meta.cnpj))} · ${esc(meta.uf||'—')}${hasUf?'':' <span class="c-bad">(UF sem cadastro)</span>'} · ${nfFmtData(meta.data)} · ${brl(meta.vNF)} · lido só no seu navegador</p>
+    <p>Emitente <b>${esc(meta.emitNome||'—')}</b> · ${esc(nfFmtDoc(meta.emitCnpj))} · ${meta.emp?`empresa <b>${esc(empNome(meta.emp))}</b> (por ${esc(meta.empPor)})`:'<span class="c-warn">empresa não identificada (sem CRT/CNPJ) · mantém '+esc(empNome())+'</span>'}</p>
     <p>${nfTotLine(T)}</p>
     <table><thead><tr><th>Item da nota</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Desc.</th><th style="width:300px">Produto do painel</th></tr></thead><tbody>
     ${rows.map((r,i)=>`<tr class="${r.ign?'ign':!r.pid?'miss':''}"><td><div>${esc(r.xProd)}</div><div class="src">cód. ${esc(r.cProd)} · CFOP ${esc(r.cfop||'—')} · ${esc(r.ign?'ignorado':r.src)}${r.bon?' · <b style="color:var(--acc)">bonificação</b>':''}</div></td>
@@ -1353,6 +1383,7 @@ function nfConfirm(){
   for(const r of rows){if(!r.pid||r.ign||r.q<=0)continue;const a=agg[r.pid]=agg[r.pid]||{q:0,v:0,b:0};
     if(r.bon){a.b+=r.q;continue}
     const d=r.vDesc+(sumProd?rest*r.vProd/sumProd:0);a.q+=r.q;a.v+=r.vProd-d}
+  if(meta.emp&&meta.emp!==EMP){EMP=meta.emp;localStorage.setItem('laben-emp',EMP);renderEmp()}
   NUF=meta.uf;
   const fl=faixasUf(NUF);let ord=fl.length?fl[0].ordem:1;for(const f of fl){if((Number(f.pedido_de)||0)<=meta.vNF)ord=f.ordem}
   NFAIXA=ord;MARCA='';LINHA='';EMB=0;if($('nQ'))$('nQ').value='';
@@ -1378,7 +1409,35 @@ function nfClear(){NFMETA=null;localStorage.removeItem(NFMETA_KEY);renderSim()}
 function nfBarHtml(){
   if(!NFMETA)return '';const m=NFMETA;
   const extra=[m.T?nfTotLine(m.T):(m.vDesc?'desconto '+brl(m.vDesc):''),m.vFrete?'frete na nota '+brl(m.vFrete):'',m.ign?m.ign+' linha(s) ignorada(s)':'',m.miss?`<span class="c-warn">${m.miss} sem produto</span>`:'',m.semPreco?`<span class="c-warn">${m.semPreco} sem preço na UF</span>`:''].filter(Boolean).join(' · ');
-  return `<span><b>${esc(m.cliente||'—')}</b> · ${esc(nfFmtDoc(m.cnpj))}</span><span>NF <b>${esc(m.nNF)}</b> · ${nfFmtData(m.data)}</span><span>Valor <b>${brl(m.vNF)}</b> · ${esc(m.uf)}</span>${extra?`<span>${extra}</span>`:''}<button class="x" title="Fechar resumo da nota" onclick="nfClear()">×</button>`}
+  const emTxt=m.emp?`<span>Emitente <b>${esc(m.emitNome||empNome(m.emp))}</b> → <b>${esc(empNome(m.emp))}</b> selecionada automaticamente (${esc(m.empPor)})</span>`:'';
+  return emTxt+`<span><b>${esc(m.cliente||'—')}</b> · ${esc(nfFmtDoc(m.cnpj))}</span><span>NF <b>${esc(m.nNF)}</b> · ${nfFmtData(m.data)}</span><span>Valor <b>${brl(m.vNF)}</b> · ${esc(m.uf)}</span>${extra?`<span>${extra}</span>`:''}<button class="x" title="Fechar resumo da nota" onclick="nfClear()">×</button>`}
+
+function renderEmp(){
+  if($('empSeg'))$('empSeg').innerHTML=[['nutrissima','Nutríssima'],['lbr','LBR']].map(([v,l])=>`<button type="button" class="${v===EMP?'on':''}" onclick="setEmp('${v}')" title="${v==='lbr'?'Simples Nacional':'Lucro Real'}">${l}</button>`).join('');
+  const b=document.querySelector('header .badge');if(b)b.textContent=EMP==='lbr'?'LBR · Simples Nacional · por dentro':'✓ Modelo conferido · por dentro';
+  if(!$('empBox'))return;
+  const L=empRow('lbr')||{},N=empRow('nutrissima')||{};const p=v=>v==null||v===''?'':fmtIn(Math.round(Number(v)*1e6)/1e4);
+  $('empBox').innerHTML=`<h4>Empresas emissoras<small>Nutríssima: Lucro Real, usa os % desta tabela de estados · LBR: Simples Nacional (CSOSN 102)</small></h4>
+    <label>LBR · alíquota do Simples %<input id="eAl" inputmode="decimal" placeholder="informe" value="${p(L.aliquota_simples)}"></label>
+    <label>LBR · Simples sobre bonificação %<input id="eAlB" inputmode="decimal" value="${p(L.simples_bonif_pct??0)}"></label>
+    <label>LBR · CNPJ do emitente<input id="eCnL" inputmode="numeric" placeholder="só números" value="${esc(L.cnpj||'')}" style="text-align:left"></label>
+    <label>Nutríssima · CNPJ do emitente<input id="eCnN" inputmode="numeric" placeholder="só números" value="${esc(N.cnpj||'')}" style="text-align:left"></label>
+    <label><button class="btn" type="button" onclick="saveEmp()">Salvar empresas</button></label>
+    <div class="note">Na LBR os custos por dentro são Simples % + frete % + comissão % + degustação % da UF (ICMS/PIS/COFINS = 0). A bonificação custa CMV + frete % (+ Simples sobre bonificação, se informado). ${lbrAliq()==null?'<b class="c-bad">Enquanto a alíquota do Simples estiver vazia, a margem da LBR não é calculada.</b>':''}</div>`;
+}
+async function saveEmp(){
+  const pv=id=>{const t=$(id).value.trim();if(t==='')return null;const n=num(t);return n==null||Number.isNaN(n)||n<0||n>=100?NaN:Math.round(n*1e4)/1e6};
+  const al=pv('eAl'),alb=pv('eAlB');if(Number.isNaN(al)||Number.isNaN(alb)){toast('Percentual inválido',1);return}
+  const cn=id=>$(id).value.replace(/\D/g,'')||null;
+  const r1=await sb.from('empresas').update({aliquota_simples:al,simples_bonif_pct:alb??0,cnpj:cn('eCnL'),updated_at:new Date().toISOString()}).eq('id','lbr');
+  const r2=await sb.from('empresas').update({cnpj:cn('eCnN'),updated_at:new Date().toISOString()}).eq('id','nutrissima');
+  if(r1.error||r2.error){toast('Erro ao salvar: '+(r1.error||r2.error).message,1);return}
+  const em=await sb.from('empresas').select('*');if(!em.error)EMPRESAS=em.data||[];
+  toast('Empresas salvas');setEmp(EMP);
+}
+function setEmp(v){EMP=v==='lbr'?'lbr':'nutrissima';localStorage.setItem('laben-emp',EMP);renderEmp();
+  if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();
+  if(typeof OPEN!=='undefined'&&OPEN&&typeof renderDrawer==='function')renderDrawer();}
 
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
 function simRun(items,e,s,hasEsp){
@@ -1392,8 +1451,8 @@ function simRun(items,e,s,hasEsp){
     const c=calc(x.p,x.r,e,ord,pf);
     if(c.m==null){ok=false;continue}
     rec+=pf*x.q;m+=c.m*x.q;bc+=c.cmv*x.q;bi+=(c.im||0)*x.q;bf+=(c.fr||0)*x.q;bv+=(c.vv||0)*x.q;tabV+=(x.tab||0)*x.q;
-    if(bp>0&&x.q>0){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*bp;bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}
-    if(s.itemBon&&x.bq>0&&x.tab!=null){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);if(ct.cmv==null){ok=false}else{const bv=x.tab*x.bq;bonV+=bv;bonC+=ct.cmv*x.bq+bv*((ct.imPct||0)+(ct.frPct||0))}}
+    if(bp>0&&x.q>0){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*bp;bonV+=bv;bonC+=(ct.cmv/x.tab+bonImp(ct)+(ct.frPct||0))*bv}
+    if(s.itemBon&&x.bq>0&&x.tab!=null){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);if(ct.cmv==null){ok=false}else{const bv=x.tab*x.bq;bonV+=bv;bonC+=ct.cmv*x.bq+bv*(bonImp(ct)+(ct.frPct||0))}}
   }
   let k=Number(s.mult)||1;if(s.alvo>0&&rec>0)k=s.alvo/rec;
   let perc=(tabV+bonV)>0?((tabV-rec)+bonV)/(tabV+bonV):null;
@@ -1413,7 +1472,7 @@ function renderSim(){
   const hasEsp=items.some(x=>x.it.preco!=null&&x.tab!=null&&Math.abs(x.it.preco-x.tab)>0.004);
   const A=simRun(items,e,SIMA,hasEsp);
   const res=SIM.map(s=>simRun(items,e,s,hasEsp));
-  const all=[A,...res];const best=all.reduce((bi,x,i)=>x.m>all[bi].m?i:bi,0);
+  const all=[A,...res];const best=(EMP==='lbr'&&lbrAliq()==null)?-1:all.reduce((bi,x,i)=>x.m>all[bi].m?i:bi,0);
   const sg=v=>(v>0?'+':v<0?'−':'')+brl(Math.abs(v));
   const pc=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2});
   const resumo=(s,r)=>{const p=[];
@@ -1421,6 +1480,7 @@ function renderSim(){
     if(s.alvo>0)p.push('pedido '+brl(s.alvo));else if((Number(s.mult)||1)!==1)p.push(pc(s.mult)+'× volume');
     if(s.dc>0)p.push('−'+pc(s.dc)+'%');if(s.dv>0)p.push('−'+pc(s.dv)+'% à vista');if(s.bon>0)p.push(pc(s.bon)+'% bonif.');if(s.itemBon&&r.bonV)p.push('bonif. '+brl(r.bonV)+' (tabela)');if(s.nf)p.push('NF: −'+brl(s.nf.vDesc));
     return p.join(' · ')};
+  const semS=EMP==='lbr'&&lbrAliq()==null;
   const card=(i,s,r)=>{
     const isA=i===0,si=i-1;const ip=r.rec?r.m/r.rec:null;
     const dm=r.m-A.m;const mpr=r.rec?r.m/r.rec:0;const be=isA?null:(mpr>0?A.m/mpr:null);
@@ -1437,19 +1497,19 @@ function renderSim(){
     return `<div class="sc${i===best?' best':''}">
       <div class="hd"><input value="${esc(s.nome||(isA?'Atual':''))}" onchange="simSet(${si},'nome',this.value)">${i===best?'<span class="tag">Maior margem</span>':''}${isA?'':`<button class="rm" title="Remover" onclick="simDel(${si})">×</button>`}</div>
       ${isA?`<details><summary class="note" style="cursor:pointer">Ajustar condição do Atual</summary>${cfg}<button class="btn tiny sec" style="margin-top:8px" onclick="simAtualReset()">Restaurar pedido normal</button></details>`:cfg}
-      <div><div class="note">Margem R$</div><div class="big ${r.m<0?'c-bad':''}">${brl(r.m)}</div></div>
+      <div><div class="note">Margem R$</div><div class="big ${r.m<0?'c-bad':''}">${semS?'—':brl(r.m)}</div></div>
       <dl>
-        <dt>Receita</dt><dd>${brl(r.rec)}</dd>
+        ${semS?'':`<dt>Receita</dt><dd>${brl(r.rec)}</dd>`}
         <dt>Índice</dt><dd><span class="pill ${ip==null?'na':ip<0?'bad':ip<0.10?'warn':'ok'}">${idx(ip)}</span></dd>
         <dt>Volume</dt><dd>${r.k.toLocaleString('pt-BR',{maximumFractionDigits:2})}×</dd>
         ${r.bonV?`<dt>Bonificado (tabela)</dt><dd>${brl(r.bonV)}</dd><dt>Custo bonificação</dt><dd>${brl(r.bonC)}</dd>`:''}
         <dt>Desconto percebido</dt><dd>${r.perc==null?'—':r.perc<-0.0005?'<span class="muted">'+pct(-r.perc)+' acima da tabela</span>':pct(r.perc)}</dd>
-        ${isA?'':`<dt>vs Atual</dt><dd class="${dm<0?'c-bad':'c-ok'}">${sg(dm)}</dd>
+        ${isA||semS?'':`<dt>vs Atual</dt><dd class="${dm<0?'c-bad':'c-ok'}">${sg(dm)}</dd>
         <dt>Empate</dt><dd>${be==null?'não empata':brl(be)+' <span class="muted">('+(be/A.rec).toLocaleString('pt-BR',{maximumFractionDigits:2})+'×)</span>'}</dd>`}
       </dl>
-      <dl class="br"><dt>CMV</dt><dd>${brl(r.cmvR)}</dd><dt>Impostos</dt><dd>${brl(r.impR)}</dd><dt>Frete</dt><dd>${brl(r.frR)}</dd><dt>Comissão + degust.</dt><dd>${brl(r.vvR)}</dd><dt>Bonificação</dt><dd>${brl(r.bonC)}</dd><dt>Margem</dt><dd class="${r.m<0?'c-bad':'c-ok'}">${brl(r.m)}</dd></dl>
+      ${semS?'':`<dl class="br"><dt>CMV</dt><dd>${brl(r.cmvR)}</dd><dt>Impostos</dt><dd>${brl(r.impR)}</dd><dt>Frete</dt><dd>${brl(r.frR)}</dd><dt>Comissão + degust.</dt><dd>${brl(r.vvR)}</dd><dt>Bonificação</dt><dd>${brl(r.bonC)}</dd><dt>Margem</dt><dd class="${r.m<0?'c-bad':'c-ok'}">${brl(r.m)}</dd></dl>`}
       <div class="note" style="border-top:1px solid var(--line);padding-top:8px">${esc(resumo(s,r))}</div>
-      ${r.ok?'':'<div class="note c-warn">Itens sem CMV ou preço ficaram fora.</div>'}
+      ${semS?'<div class="note c-bad">LBR: informe a alíquota do Simples (Estados › Empresa) para calcular a margem.</div>':r.ok?'':'<div class="note c-warn">Itens sem CMV ou preço ficaram fora.</div>'}
     </div>`};
   $('sC').innerHTML=card(0,SIMA,A)+SIM.map((s,i)=>card(i+1,s,res[i])).join('');
   $('sC').style.gridTemplateColumns=`repeat(${1+SIM.length},minmax(0,1fr))`;
