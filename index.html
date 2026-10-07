@@ -1230,7 +1230,7 @@ function renderNeg(){
 }
 /* ===== Simulador de campanha ===== */
 const SIM_KEY='laben-sim-v2';
-const simNew=(o)=>Object.assign({nome:'',mult:1,alvo:null,faixa:null,dc:0,dv:0,bon:0},o||{});
+const simNew=(o)=>Object.assign({nome:'',mult:1,alvo:null,faixa:null,dc:0,dv:0,bon:0,itemBon:false,nf:null},o||{});
 let SIMA=simNew({nome:'Atual'});
 let SIM=[simNew({nome:'Cenário 1',mult:1.5,dc:10}),simNew({nome:'Cenário 2',mult:1.5,bon:10}),simNew({nome:'Cenário 3',alvo:3000,faixa:3,dv:3})];
 try{const o=JSON.parse(localStorage.getItem(SIM_KEY)||'null');if(o&&Array.isArray(o.list)){SIM=o.list.map(simNew);SIMA=simNew(o.atual)}}catch(e){}
@@ -1239,6 +1239,7 @@ function simAdd(){if(SIM.length>=3)return;SIM.push(simNew({nome:'Cenário '+(SIM
 function simDel(i){SIM.splice(i,1);simSave();renderSim()}
 function simSet(i,f,v){const s=i<0?SIMA:SIM[i];if(!s)return;
   if(f==='nome')s.nome=v;
+  else if(f==='itemBon')s.itemBon=!!v;
   else if(f==='faixa')s.faixa=(v==='esp'||v==='cur')?v:Number(v);
   else{const n=num(v);s[f]=(String(v).trim()===''||n==null||Number.isNaN(n))?(f==='alvo'?null:(f==='mult'?1:0)):Math.max(0,n)}
   simSave();renderSim()}
@@ -1252,8 +1253,8 @@ function simItems(){
   const vis=new Set(negCatalog().map(x=>x.p.id));const out=[];
   for(const it of NEG){if(!vis.has(it.pid))continue;const p=PROD.find(x=>x.id===it.pid);if(!p)continue;
     const r=preRow(NUF,p.id)||{id:'tmp_'+p.id,uf:NUF,produto_id:p.id};
-    const tab=precoFaixa(r,NFAIXA,p);const pb=it.preco==null?tab:Number(it.preco);const q=Number(it.qtd)||0;
-    if(q>0&&pb!=null)out.push({it,p,r,tab,pb,q})}
+    const tab=precoFaixa(r,NFAIXA,p);const pb=it.preco==null?tab:Number(it.preco);const q=Number(it.qtd)||0;const bq=Number(it.bon)||0;
+    if((q>0||bq>0)&&pb!=null)out.push({it,p,r,tab,pb,q,bq})}
   return {e,items:out}}
 
 
@@ -1310,7 +1311,8 @@ function nfParse(txt){
     vNF:nfNum(nfTxt(tot,'vNF')),vFrete:nfNum(nfTxt(tot,'vFrete')),vDesc:nfNum(nfTxt(tot,'vDesc')),vProd:nfNum(nfTxt(tot,'vProd'))};
   const rows=[];
   for(const det of Array.from(inf.getElementsByTagNameNS('*','det'))){const pr=nfEl(det,'prod');if(!pr)continue;
-    const r={cProd:nfTxt(pr,'cProd'),xProd:nfTxt(pr,'xProd'),q:nfNum(nfTxt(pr,'qCom')),vUn:nfNum(nfTxt(pr,'vUnCom')),vProd:nfNum(nfTxt(pr,'vProd')),vDesc:nfNum(nfTxt(pr,'vDesc'))};
+    const r={cProd:nfTxt(pr,'cProd'),xProd:nfTxt(pr,'xProd'),q:nfNum(nfTxt(pr,'qCom')),vUn:nfNum(nfTxt(pr,'vUnCom')),vProd:nfNum(nfTxt(pr,'vProd')),vDesc:nfNum(nfTxt(pr,'vDesc')),cfop:nfTxt(pr,'CFOP')};
+    r.bon=/^[56]910$/.test(r.cfop)||r.vProd<=0;
     const m=nfMatch(r.cProd,r.xProd);r.pid=m.pid==='__ign'?'':m.pid;r.ign=m.pid==='__ign';r.src=m.src;rows.push(r)}
   if(!rows.length)throw new Error('sem itens');
   NFR={meta,rows};nfReview();
@@ -1322,11 +1324,13 @@ function nfReview(){
   const opts=pid=>{const by={};for(const p of PROD)(by[marcaNome(marcaOf(p))]=by[marcaNome(marcaOf(p))]||[]).push(p);
     return `<option value="">— escolher produto —</option><option value="__ign" ${''}>Ignorar esta linha</option>`+Object.keys(by).sort().map(m=>`<optgroup label="${esc(m)}">${by[m].sort((a,b)=>nice(a.descricao).localeCompare(nice(b.descricao),'pt-BR')).map(p=>`<option value="${p.id}" ${p.id===pid?'selected':''}>${esc(nice(p.descricao))}${p.codigo?' · '+esc(p.codigo):''}</option>`).join('')}</optgroup>`).join('')};
   const nMiss=rows.filter(r=>!r.pid&&!r.ign).length;
+  const T=nfTotals(meta,rows);
   const hasUf=EST.some(e=>e.uf===meta.uf);
   $('nfm').innerHTML=`<h3>Conferir NF-e ${esc(meta.nNF)}</h3>
     <p><b>${esc(meta.cliente||'—')}</b> · ${esc(nfFmtDoc(meta.cnpj))} · ${esc(meta.uf||'—')}${hasUf?'':' <span class="c-bad">(UF sem cadastro)</span>'} · ${nfFmtData(meta.data)} · ${brl(meta.vNF)} · lido só no seu navegador</p>
+    <p>${nfTotLine(T)}</p>
     <table><thead><tr><th>Item da nota</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Desc.</th><th style="width:300px">Produto do painel</th></tr></thead><tbody>
-    ${rows.map((r,i)=>`<tr class="${r.ign?'ign':!r.pid?'miss':''}"><td><div>${esc(r.xProd)}</div><div class="src">cód. ${esc(r.cProd)} · ${esc(r.ign?'ignorado':r.src)}</div></td>
+    ${rows.map((r,i)=>`<tr class="${r.ign?'ign':!r.pid?'miss':''}"><td><div>${esc(r.xProd)}</div><div class="src">cód. ${esc(r.cProd)} · CFOP ${esc(r.cfop||'—')} · ${esc(r.ign?'ignorado':r.src)}${r.bon?' · <b style="color:var(--acc)">bonificação</b>':''}</div></td>
       <td class="n">${fmtIn(r.q)}</td><td class="n">${brl(r.vUn)}</td><td class="n">${r.vDesc?brl(r.vDesc):'—'}</td>
       <td><select onchange="nfPick(${i},this.value)">${opts(r.pid).replace(r.ign?'value="__ign" ':'@@','value="__ign" selected ')}</select></td></tr>`).join('')}
     </tbody></table>
@@ -1341,30 +1345,39 @@ function nfConfirm(){
   for(const r of rows){if(!r.pid&&!r.ign)continue;const v=r.ign?'__ign':r.pid;NFMAP['c:'+r.cProd]=v;NFMAP['n:'+fold(r.xProd).replace(/\s+/g,' ').trim()]=v}
   localStorage.setItem(NFMAP_KEY,JSON.stringify(NFMAP));
   /* rateio do desconto total que não estiver nos itens */
-  const sumProd=rows.reduce((a,r)=>a+r.vProd,0),sumDesc=rows.reduce((a,r)=>a+r.vDesc,0);
+  /* rateio do desconto total só entre os itens vendidos */
+  const sold=rows.filter(r=>!r.bon);
+  const sumProd=sold.reduce((a,r)=>a+r.vProd,0),sumDesc=sold.reduce((a,r)=>a+r.vDesc,0);
   const rest=Math.max(0,(meta.vDesc||0)-sumDesc);
   const agg={};
-  for(const r of rows){if(!r.pid||r.ign||r.q<=0)continue;const d=r.vDesc+(sumProd?rest*r.vProd/sumProd:0);
-    const a=agg[r.pid]=agg[r.pid]||{q:0,v:0};a.q+=r.q;a.v+=r.vProd-d}
+  for(const r of rows){if(!r.pid||r.ign||r.q<=0)continue;const a=agg[r.pid]=agg[r.pid]||{q:0,v:0,b:0};
+    if(r.bon){a.b+=r.q;continue}
+    const d=r.vDesc+(sumProd?rest*r.vProd/sumProd:0);a.q+=r.q;a.v+=r.vProd-d}
   NUF=meta.uf;
   const fl=faixasUf(NUF);let ord=fl.length?fl[0].ordem:1;for(const f of fl){if((Number(f.pedido_de)||0)<=meta.vNF)ord=f.ordem}
   NFAIXA=ord;MARCA='';LINHA='';EMB=0;if($('nQ'))$('nQ').value='';
-  NEG=Object.entries(agg).map(([pid,a])=>({pid,qtd:Math.round(a.q*1000)/1000,preco:Math.round(a.v/a.q*10000)/10000}));
+  NEG=Object.entries(agg).map(([pid,a])=>{const o={pid,qtd:Math.round(a.q*1000)/1000,preco:a.q>0?Math.round(a.v/a.q*10000)/10000:null};if(a.b>0)o.bon=Math.round(a.b*1000)/1000;return o});
   const semPreco=NEG.filter(it=>!preRow(NUF,it.pid)).length;
   negSave();
   const cli=(meta.cliente||'cliente').split(/\s+/).slice(0,3).join(' ');
-  SIMA=simNew({nome:`Faturado NF ${meta.nNF} · ${cli}`,faixa:'esp'});
+  const T=nfTotals(meta,rows);
+  SIMA=simNew({nome:`Faturado NF ${meta.nNF} · ${cli}`,faixa:'esp',itemBon:true,nf:{vProd:T.vProd,vDesc:T.vDesc}});
   const c1=simNew({nome:'Cenário 1 · tabela',faixa:'cur'});if(SIM.length)SIM[0]=c1;else SIM.push(c1);
   simSave();
-  NFMETA=Object.assign({},meta,{ign:rows.filter(r=>r.ign).length,miss:rows.filter(r=>!r.pid&&!r.ign).length,semPreco});
+  NFMETA=Object.assign({},meta,{T,ign:rows.filter(r=>r.ign).length,miss:rows.filter(r=>!r.pid&&!r.ign).length,semPreco});
   localStorage.setItem(NFMETA_KEY,JSON.stringify(NFMETA));
   closeAll();renderSim();
   toast(`NF ${meta.nNF} carregada · ${NEG.length} produto${NEG.length===1?'':'s'}`+(semPreco?` · ${semPreco} sem preço na UF`:''));
 }
+function nfTotals(meta,rows){
+  const live=rows.filter(r=>!r.ign);const sold=live.filter(r=>!r.bon),bon=live.filter(r=>r.bon);
+  const vProd=sold.reduce((a,r)=>a+r.vProd,0)||meta.vProd||0;
+  return {vProd,vDesc:meta.vDesc||0,dPct:vProd?(meta.vDesc||0)/vProd:null,vNF:meta.vNF,nSold:sold.length,qSold:sold.reduce((a,r)=>a+r.q,0),nBon:bon.length,qBon:bon.reduce((a,r)=>a+r.q,0)}}
+function nfTotLine(T){return `Produtos <b>${brl(T.vProd)}</b> (${T.nSold} linha${T.nSold===1?'':'s'} · ${fmtIn(T.qSold)} un.) · Desconto <b>${brl(T.vDesc)}</b> (${pct(T.dPct)}) · Nota <b>${brl(T.vNF)}</b> · Bonificadas <b>${T.nBon}</b> linha${T.nBon===1?'':'s'}${T.nBon?' ('+fmtIn(T.qBon)+' un.)':''}`}
 function nfClear(){NFMETA=null;localStorage.removeItem(NFMETA_KEY);renderSim()}
 function nfBarHtml(){
   if(!NFMETA)return '';const m=NFMETA;
-  const extra=[m.vDesc?'desconto '+brl(m.vDesc):'',m.vFrete?'frete na nota '+brl(m.vFrete):'',m.ign?m.ign+' linha(s) ignorada(s)':'',m.miss?`<span class="c-warn">${m.miss} sem produto</span>`:'',m.semPreco?`<span class="c-warn">${m.semPreco} sem preço na UF</span>`:''].filter(Boolean).join(' · ');
+  const extra=[m.T?nfTotLine(m.T):(m.vDesc?'desconto '+brl(m.vDesc):''),m.vFrete?'frete na nota '+brl(m.vFrete):'',m.ign?m.ign+' linha(s) ignorada(s)':'',m.miss?`<span class="c-warn">${m.miss} sem produto</span>`:'',m.semPreco?`<span class="c-warn">${m.semPreco} sem preço na UF</span>`:''].filter(Boolean).join(' · ');
   return `<span><b>${esc(m.cliente||'—')}</b> · ${esc(nfFmtDoc(m.cnpj))}</span><span>NF <b>${esc(m.nNF)}</b> · ${nfFmtData(m.data)}</span><span>Valor <b>${brl(m.vNF)}</b> · ${esc(m.uf)}</span>${extra?`<span>${extra}</span>`:''}<button class="x" title="Fechar resumo da nota" onclick="nfClear()">×</button>`}
 
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
@@ -1379,10 +1392,12 @@ function simRun(items,e,s,hasEsp){
     const c=calc(x.p,x.r,e,ord,pf);
     if(c.m==null){ok=false;continue}
     rec+=pf*x.q;m+=c.m*x.q;bc+=c.cmv*x.q;bi+=(c.im||0)*x.q;bf+=(c.fr||0)*x.q;bv+=(c.vv||0)*x.q;tabV+=(x.tab||0)*x.q;
-    if(bp>0){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*bp;bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}
+    if(bp>0&&x.q>0){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*bp;bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}
+    if(s.itemBon&&x.bq>0&&x.tab!=null){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);if(ct.cmv==null){ok=false}else{const bv=x.tab*x.bq;bonV+=bv;bonC+=ct.cmv*x.bq+bv*((ct.imPct||0)+(ct.frPct||0))}}
   }
   let k=Number(s.mult)||1;if(s.alvo>0&&rec>0)k=s.alvo/rec;
-  const perc=(tabV+bonV)>0?((tabV-rec)+bonV)/(tabV+bonV):null;
+  let perc=(tabV+bonV)>0?((tabV-rec)+bonV)/(tabV+bonV):null;
+  if(s.nf&&s.nf.vProd>0)perc=(s.nf.vDesc+bonV)/(s.nf.vProd+bonV); /* NF: desconto da nota + bonificação */
   return {k,cmvR:bc*k,impR:bi*k,frR:bf*k,vvR:bv*k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok,fx,perc}}
 function renderSim(){
   if(!$('sC'))return;
@@ -1404,7 +1419,7 @@ function renderSim(){
   const resumo=(s,r)=>{const p=[];
     p.push(r.fx==='esp'?'Preço especial':r.fx==='cur'?'Tabela atual':fxShort(r.fx));
     if(s.alvo>0)p.push('pedido '+brl(s.alvo));else if((Number(s.mult)||1)!==1)p.push(pc(s.mult)+'× volume');
-    if(s.dc>0)p.push('−'+pc(s.dc)+'%');if(s.dv>0)p.push('−'+pc(s.dv)+'% à vista');if(s.bon>0)p.push(pc(s.bon)+'% bonif.');
+    if(s.dc>0)p.push('−'+pc(s.dc)+'%');if(s.dv>0)p.push('−'+pc(s.dv)+'% à vista');if(s.bon>0)p.push(pc(s.bon)+'% bonif.');if(s.itemBon&&r.bonV)p.push('bonif. '+brl(r.bonV)+' (tabela)');if(s.nf)p.push('NF: −'+brl(s.nf.vDesc));
     return p.join(' · ')};
   const card=(i,s,r)=>{
     const isA=i===0,si=i-1;const ip=r.rec?r.m/r.rec:null;
@@ -1417,6 +1432,7 @@ function renderSim(){
         <label>Desc. comercial %<input inputmode="decimal" value="${fmtIn(s.dc)}" onchange="simSet(${si},'dc',this.value)"></label>
         <label>Desc. à vista %<input inputmode="decimal" value="${fmtIn(s.dv)}" onchange="simSet(${si},'dv',this.value)"></label>
         <label>Bonificação %<input inputmode="decimal" value="${fmtIn(s.bon)}" onchange="simSet(${si},'bon',this.value)"></label>
+        ${items.some(x=>x.bq>0)?`<label style="flex-direction:row;align-items:center;gap:6px;grid-column:1/-1"><input type="checkbox" style="width:auto" ${s.itemBon?'checked':''} onchange="simSet(${si},'itemBon',this.checked)"> Bonificação por item (${fmtIn(items.reduce((a,x)=>a+x.bq,0))} un.)</label>`:''}
       </div>`;
     return `<div class="sc${i===best?' best':''}">
       <div class="hd"><input value="${esc(s.nome||(isA?'Atual':''))}" onchange="simSet(${si},'nome',this.value)">${i===best?'<span class="tag">Maior margem</span>':''}${isA?'':`<button class="rm" title="Remover" onclick="simDel(${si})">×</button>`}</div>
@@ -1439,7 +1455,7 @@ function renderSim(){
   $('sC').style.gridTemplateColumns=`repeat(${1+SIM.length},minmax(0,1fr))`;
   $('sH').innerHTML=`<tr><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Preço especial</th><th class="n">Margem R$</th><th class="n">Índice</th></tr>`;
   $('sB').innerHTML=items.map(x=>{const c=calc(x.p,x.r,e,NFAIXA,x.pb);const ov=x.it.preco!=null&&x.tab!=null&&Math.abs(x.it.preco-x.tab)>0.004;
-    return `<tr class="row"><td><div class="pn">${esc(nice(x.p.descricao))}</div><div class="ps">${esc(embName(embOf(x.p)))}${ov?' · condição especial':''}</div></td>
+    return `<tr class="row"><td><div class="pn">${esc(nice(x.p.descricao))}</div><div class="ps">${esc(embName(embOf(x.p)))}${ov?' · condição especial':''}${x.bq?' · '+fmtIn(x.bq)+' bonif.':''}</div></td>
     <td class="n"><span class="muted">${brl(x.tab)}</span></td>
     <td class="n"><input class="q" inputmode="decimal" data-pid="${x.p.id}" data-f="qtd" value="${fmtIn(x.q)}" onchange="simEdit(this)"></td>
     <td class="n"><input class="pr" inputmode="decimal" data-pid="${x.p.id}" data-f="preco" value="${fmtIn(x.pb)}" onchange="simEdit(this)" title="Vazio = preço de tabela"></td>
