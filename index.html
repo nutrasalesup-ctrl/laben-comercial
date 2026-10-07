@@ -341,6 +341,7 @@ tr.row.off .pn{font-weight:400}
       <select class="sel" id="nUfOther" title="Outros estados"></select>
     </div>
     <div class="kpis" id="nK" style="margin-top:14px"></div>
+    <div class="cond" id="nPrem" style="font-size:12px;margin:-4px 0 12px"></div>
     <div class="tcard">
       <div class="tools">
         <label class="search">
@@ -1030,10 +1031,12 @@ function negAddFiltered(){
 function negEdit(el){
   const pid=el.dataset.pid,f=el.dataset.f;let v=num(el.value);
   if(Number.isNaN(v)||v==null){toast('Valor inválido',1);renderNeg();return}
-  if(f==='qtd'&&v<=0){toast('Quantidade mínima 1',1);v=1}
+  if(f==='qtd'&&v<0){toast('Quantidade inválida',1);v=0}
+  if(f==='bon'&&v<0){toast('Quantidade inválida',1);v=0}
+  if(f==='bon'&&!negItem(pid)){if(v<=0){renderNeg();return}const p=PROD.find(x=>x.id===pid);if(!p)return;const r=preRow(NUF,pid)||{id:'tmp'};NEG.push({pid,qtd:0,preco:precoFaixa(r,NFAIXA,p),bon:Math.round(v*1000)/1000});negSave();renderNeg();return}
   if(f==='preco'&&v<0){toast('Preço inválido',1);renderNeg();return}
   const it=negItem(pid);if(!it)return;
-  it[f]=f==='qtd'?Math.round(v*1000)/1000:Math.round(v*100)/100;
+  it[f]=f!=='preco'?Math.round(v*1000)/1000:Math.round(v*100)/100;
   negSave();renderNeg();
 }
 function negCatalog(){
@@ -1082,30 +1085,38 @@ function renderNeg(){
 
   const catalog=negCatalog();
   /* KPIs from selected mix (all selected, not only filtered) */
-  let rec=0,cmvT=0,varT=0,mT=0,ok=0,nSel=0;
+  let rec=0,cmvT=0,varT=0,mT=0,ok=0,nSel=0,bonV=0,bonC=0,bonQ=0;
   for(const it of NEG){
     const p=PROD.find(x=>x.id===it.pid);if(!p)continue;
     const r=preRow(NUF,p.id)||{id:'tmp_'+p.id,uf:NUF,produto_id:p.id};
     const pf=it.preco==null?precoFaixa(r,NFAIXA,p):Number(it.preco);
     const q=Number(it.qtd)||0;const c=calc(p,r,e,NFAIXA,pf);nSel++;
+    const bq=Number(it.bon)||0;
+    if(bq>0){const tab=precoFaixa(r,NFAIXA,p);const ct=calc(p,r,e,NFAIXA,tab);
+      if(tab!=null&&ct.cmv!=null){bonQ+=bq;bonV+=tab*bq;bonC+=(ct.cmv+tab*(ct.imPct||0)+tab*(ct.frPct||0))*bq}}
     if(c.pf==null||q<=0)continue;
     rec+=c.pf*q;if(c.cmv!=null)cmvT+=c.cmv*q;if(c.custos!=null&&c.cmv!=null)varT+=(c.custos-c.cmv)*q;if(c.m!=null){mT+=c.m*q;ok++}
   }
   const mp=rec?mT/rec:null;
-  const avgCls=mp==null?'c-mut':mp<0?'c-bad':mp<0.10?'c-warn':'c-ok';
+  const mT2=mT-bonC,mp2=rec?mT2/rec:null;
+  const dp=(rec+bonV)?bonV/(rec+bonV):null;
+  const pp=mp!=null&&mp2!=null?(mp2-mp)*100:null;
+  const cls=x=>x==null?'c-mut':x<0?'c-bad':x<0.10?'c-warn':'c-ok';
+  const ppf=x=>x==null?'—':(x>0?'+':'')+x.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' p.p.';
   $('nK').innerHTML=`
-    <div class="kpi"><span>No pedido</span><b>${nSel}</b><small>${catalog.length} visíveis no filtro</small></div>
-    <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>preço × quantidade</small></div>
-    <div class="kpi"><span>CMV do pedido</span><b>${brl(cmvT||null)}</b><small>${rec?pct(cmvT/rec):'—'} do preço</small></div>
-    <div class="kpi"><span>Custos variáveis</span><b>${brl(varT||null)}</b><small>${rec?pct(varT/rec):'—'} do preço</small></div>
-    <div class="kpi"><span>Margem do pedido</span><b class="${avgCls}">${pct(mp)}</b><small>${brl(mT||null)}</small></div>`;
+    <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>${nSel} itens · preço × qtd</small></div>
+    <div class="kpi"><span>Valor bonificado</span><b>${brl(bonV||null)}</b><small>${bonQ?fmtIn(bonQ)+' un. a preço de tabela':'sem bonificação'}</small></div>
+    <div class="kpi"><span>Desconto percebido</span><b>${bonV?pct(dp):'—'}</b><small>bonif. ÷ (receita + bonif.)</small></div>
+    <div class="kpi"><span>Custo real da bonificação</span><b>${brl(bonC||null)}</b><small>CMV + ICMS + frete</small></div>
+    <div class="kpi"><span>Margem do pedido</span><b class="${cls(mp2)}">${pct(mp2)}</b><small>${bonV?`sem bonif. ${pct(mp)} · ${brl(mT)} → ${brl(mT2)} · <span style="color:var(--bad);font-weight:600">${ppf(pp)}</span>`:brl(mT||null)}</small></div>`;
   $('nK').style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
+  $('nPrem').textContent=`Bonificação: receita zero · custo = CMV + ICMS ${pct0(e.imposto_pct)} e frete sobre o preço de tabela · sem PIS/COFINS · comissão e degustação não incidem.`;
   $('nChip').textContent=nSel+' no pedido'+(rec?` · ${brl(rec)}`:'');
 
-  $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Margem %</th></tr>`;
+  $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Qtd bonificada</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Margem %</th></tr>`;
 
   if(!catalog.length){
-    $('nB').innerHTML=`<tr><td colspan="9" class="empty"><b>Nenhum produto neste filtro</b>Ajuste marca, linha, embalagem ou busca.</td></tr>`;
+    $('nB').innerHTML=`<tr><td colspan="10" class="empty"><b>Nenhum produto neste filtro</b>Ajuste marca, linha, embalagem ou busca.</td></tr>`;
     return;
   }
 
@@ -1123,7 +1134,7 @@ function renderNeg(){
   for(const g of gKeys){
     const listG=groups[g].slice().sort((a,b)=>embOf(a.p)-embOf(b.p)||nice(a.p.descricao).localeCompare(nice(b.p.descricao),'pt-BR'));
     const selN=listG.filter(x=>negItem(x.p.id)).length;
-    html+=`<tr class="grp"><td colspan="9">${esc(g)}<span class="gm">${listG.length} produto${listG.length>1?'s':''}${selN?` · <b>${selN} no pedido</b>`:''}</span></td></tr>`;
+    html+=`<tr class="grp"><td colspan="10">${esc(g)}<span class="gm">${listG.length} produto${listG.length>1?'s':''}${selN?` · <b>${selN} no pedido</b>`:''}</span></td></tr>`;
     for(const x of listG){
       const it=negItem(x.p.id);const on=!!it;
       const pf=on?(it.preco==null?x.tab:Number(it.preco)):x.tab;
@@ -1135,7 +1146,8 @@ function renderNeg(){
         <td class="ck"><input class="ck" type="checkbox" ${on?'checked':''} data-pid="${x.p.id}" onchange="negToggle(this.dataset.pid,this.checked)"></td>
         <td><div class="pn">${esc(nice(x.p.descricao))}</div><div class="ps">${esc(embName(embOf(x.p)))}${dLab?' · '+esc(dLab):''}</div></td>
         <td class="n"><span class="muted">${brl(x.tab)}</span></td>
-        <td class="n">${on?`<input class="q" inputmode="decimal" data-pid="${x.p.id}" data-f="qtd" value="${fmtIn(q||1)}" onchange="negEdit(this)">`:'<span class="muted">—</span>'}</td>
+        <td class="n">${on?`<input class="q" inputmode="decimal" data-pid="${x.p.id}" data-f="qtd" value="${fmtIn(q)}" onchange="negEdit(this)">`:'<span class="muted">—</span>'}</td>
+        <td class="n"><input class="q" inputmode="decimal" data-pid="${x.p.id}" data-f="bon" value="${fmtIn(on?(Number(it.bon)||0):0)}" onchange="negEdit(this)"></td>
         <td class="n">${on?`<input class="pr" inputmode="decimal" data-pid="${x.p.id}" data-f="preco" value="${fmtIn(pf)}" onchange="negEdit(this)">`:'<span class="muted">—</span>'}</td>
         <td class="n">${!on||c.cmv==null?'—':brl(c.cmv)}</td>
         <td class="n">${!on||c.custos==null||c.cmv==null?'—':brl(c.custos-c.cmv)}</td>
