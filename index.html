@@ -189,6 +189,13 @@ tr.miss td{background:#fff8f7}
   .title h2{font-size:24px}
 }
 
+/* faixa da UF */
+.ufstrip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:12px 0 0;padding:9px 14px;background:#fff;border-radius:12px;box-shadow:var(--sh);font-size:12px;color:var(--mut)}
+.ufstrip b{color:#1d1d1f;font-weight:600;font-variant-numeric:tabular-nums}
+.ufstrip .tot{background:#f5f5f7;border-radius:999px;padding:2px 10px}
+.ufstrip a{color:var(--acc);text-decoration:none;margin-left:auto}
+.ufstrip .w{color:var(--warn);background:var(--warn-bg);border-radius:999px;padding:2px 10px}
+.sc dl.br{border-top:1px solid var(--line);padding-top:8px;font-size:12px}
 /* simulador */
 .scs{display:grid;gap:14px;margin:14px 0 18px}
 .sc{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:18px;display:flex;flex-direction:column;gap:10px;border:2px solid transparent}
@@ -357,6 +364,7 @@ tr.row.off .pn{font-weight:400}
         <button class="btn sec" type="button" onclick="simAdd()" id="sAddBtn">+ Cenário</button>
       </div>
     </div>
+    <div class="ufstrip" id="sUfBar"></div>
     <div class="scs" id="sC"></div>
     <div class="cond" style="font-size:12px;margin:-6px 0 12px">Índice = margem % ÷ 10. Bonificação: receita zero, custo = CMV + ICMS + frete sobre o valor de tabela, sem PIS/COFINS. Empate = tamanho de pedido (R$) que iguala a margem R$ do Atual com aquela condição.</div>
     <div class="tcard"><div class="tscroll"><table><thead id="sH"></thead><tbody id="sB"></tbody></table></div></div>
@@ -378,6 +386,7 @@ tr.row.off .pn{font-weight:400}
       <div class="ufseg" id="nUfSeg"></div>
       <select class="sel" id="nUfOther" title="Outros estados"></select>
     </div>
+    <div class="ufstrip" id="nUfBar"></div>
     <div class="kpis" id="nK" style="margin-top:14px"></div>
     <div class="cond" id="nPrem" style="font-size:12px;margin:-4px 0 12px"></div>
     <div class="tcard">
@@ -1097,7 +1106,8 @@ function renderNeg(){
   if(!$('nK'))return;
   negUfBar();
   const e=EST.find(x=>x.uf===NUF);
-  if(!e){$('nK').innerHTML='';$('nB').innerHTML='';return}
+  if(!e){$('nK').innerHTML='';$('nB').innerHTML='';$('nUfBar').innerHTML='';return}
+  $('nUfBar').innerHTML=ufStripHtml(e,NEG.map(it=>({r:preRow(NUF,it.pid)||{}})));
   const frPct0=e.frete_pct==null?null:Number(e.frete_pct);
   const cd=(Number(e.comissao_pct)||0)+(Number(e.degustacao_pct)||0);
   $('nEst').innerHTML=`${esc(e.nome)} · ICMS ${pct0(e.imposto_pct)} · PIS/COFINS ${pct0((Number(e.pis_pct)||0)+(Number(e.cofins_pct)||0))} · Frete ${pct0(frPct0)} · Com.+deg. ${pct0(cd)} · marque os itens do mix`;
@@ -1227,40 +1237,42 @@ function simItems(){
     const tab=precoFaixa(r,NFAIXA,p);const pb=it.preco==null?tab:Number(it.preco);const q=Number(it.qtd)||0;
     if(q>0&&pb!=null)out.push({it,p,r,tab,pb,q})}
   return {e,items:out}}
-/* um cenário: k = multiplicador de volume */
-function simRun(items,e,s){
-  const priceOf=x=>!s?x.pb:s.tipo==='desc'?x.pb*(1-(Number(s.val)||0)/100):s.tipo==='faixa'?precoFaixa(x.r,Number(s.val)||1,x.p):x.pb;
-  let rec=0,m=0,bonV=0,bonC=0,ok=true;
-  for(const x of items){const pf=priceOf(x);const c=calc(x.p,x.r,e,s&&s.tipo==='faixa'?Number(s.val):NFAIXA,pf);
-    if(c.m==null){ok=false;continue}rec+=pf*x.q;m+=c.m*x.q;
-    if(s&&s.tipo==='bon'){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*(Number(s.val)||0)/100;
-      bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}}
-  let k=s?(Number(s.mult)||1):1;
-  if(s&&s.alvo>0&&rec>0)k=s.alvo/rec;
-  return {k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok}}
+
+
+function ufStripHtml(e,items){
+  if(!e)return '';
+  const n=v=>v==null?null:Number(v);
+  const fx=[['ICMS',n(e.imposto_pct)],['PIS',n(e.pis_pct)],['COFINS',n(e.cofins_pct)],['Frete',n(e.frete_pct)],['Comissão',n(e.comissao_pct)],['Degustação',n(e.degustacao_pct)]];
+  const tot=fx.reduce((a,x)=>a+(x[1]||0),0);
+  let own=0;for(const x of items||[]){const fr=val(x.r,'frete_cif');if(fr!=null&&e.frete_pct!=null&&Math.abs(fr-Number(e.frete_pct))>1e-9)own++;else if(fr!=null&&e.frete_pct==null)own++}
+  return `<span>${esc(e.uf)} · vem do cadastro do estado</span>`+fx.map(([l,v])=>`<span>${l} <b>${pct0(v)}</b></span>`).join('')+
+    `<span class="tot">Custos variáveis <b>${pct0(tot)}</b></span>`+
+    (own?`<span class="w" title="Esses itens usam o frete do cadastro do produto nesta UF">${own} item${own>1?'s':''} com frete próprio</span>`:'')+
+    `<a href="#" onclick="document.querySelector('#tabs [data-tab=estados]').click();return false">Editar em Estados ›</a>`}
 
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
 function simRun(items,e,s,hasEsp){
   const fx=simFx(s,hasEsp);const ord=typeof fx==='number'?fx:NFAIXA;
   const dc=(Number(s.dc)||0)/100,dv=(Number(s.dv)||0)/100,bp=(Number(s.bon)||0)/100;
-  let rec=0,m=0,bonV=0,bonC=0,tabV=0,ok=true;
+  let rec=0,m=0,bonV=0,bonC=0,tabV=0,ok=true,bc=0,bi=0,bf=0,bv=0;
   for(const x of items){
     const base=fx==='esp'?x.pb:fx==='cur'?x.tab:precoFaixa(x.r,fx,x.p);
     if(base==null){ok=false;continue}
     const pf=base*(1-dc)*(1-dv);
     const c=calc(x.p,x.r,e,ord,pf);
     if(c.m==null){ok=false;continue}
-    rec+=pf*x.q;m+=c.m*x.q;tabV+=(x.tab||0)*x.q;
+    rec+=pf*x.q;m+=c.m*x.q;bc+=c.cmv*x.q;bi+=(c.im||0)*x.q;bf+=(c.fr||0)*x.q;bv+=(c.vv||0)*x.q;tabV+=(x.tab||0)*x.q;
     if(bp>0){const ct=calc(x.p,x.r,e,NFAIXA,x.tab);const bv=x.tab*x.q*bp;bonV+=bv;bonC+=(ct.cmv/x.tab+(ct.imPct||0)+(ct.frPct||0))*bv}
   }
   let k=Number(s.mult)||1;if(s.alvo>0&&rec>0)k=s.alvo/rec;
   const perc=(tabV+bonV)>0?((tabV-rec)+bonV)/(tabV+bonV):null;
-  return {k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok,fx,perc}}
+  return {k,cmvR:bc*k,impR:bi*k,frR:bf*k,vvR:bv*k,rec:rec*k,m:(m-bonC)*k,bonV:bonV*k,bonC:bonC*k,ok,fx,perc}}
 function renderSim(){
   if(!$('sC'))return;
   $('sUf').innerHTML=EST.slice().sort((a,b)=>a.uf.localeCompare(b.uf)).map(e=>`<option value="${e.uf}" ${e.uf===NUF?'selected':''}>${e.uf} · ${esc(e.nome)}</option>`).join('');
   $('sAddBtn').classList.toggle('hide',SIM.length>=3);
   const {e,items}=simItems();
+  $('sUfBar').innerHTML=ufStripHtml(EST.find(x=>x.uf===NUF),items);
   const fxl=faixasUf(NUF);const fxName=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
   const fxShort=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'Faixa R$'+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
   $('sEst').innerHTML=e?`${esc(e.nome)} · tabela atual: ${fxName(NFAIXA)} · ${items.length} produto${items.length===1?'':'s'} do mix da Negociação`:'Selecione um estado';
@@ -1301,6 +1313,7 @@ function renderSim(){
         ${isA?'':`<dt>vs Atual</dt><dd class="${dm<0?'c-bad':'c-ok'}">${sg(dm)}</dd>
         <dt>Empate</dt><dd>${be==null?'não empata':brl(be)+' <span class="muted">('+(be/A.rec).toLocaleString('pt-BR',{maximumFractionDigits:2})+'×)</span>'}</dd>`}
       </dl>
+      <dl class="br"><dt>CMV</dt><dd>${brl(r.cmvR)}</dd><dt>Impostos</dt><dd>${brl(r.impR)}</dd><dt>Frete</dt><dd>${brl(r.frR)}</dd><dt>Comissão + degust.</dt><dd>${brl(r.vvR)}</dd><dt>Bonificação</dt><dd>${brl(r.bonC)}</dd><dt>Margem</dt><dd class="${r.m<0?'c-bad':'c-ok'}">${brl(r.m)}</dd></dl>
       <div class="note" style="border-top:1px solid var(--line);padding-top:8px">${esc(resumo(s,r))}</div>
       ${r.ok?'':'<div class="note c-warn">Itens sem CMV ou preço ficaram fora.</div>'}
     </div>`};
