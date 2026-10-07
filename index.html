@@ -189,6 +189,20 @@ tr.miss td{background:#fff8f7}
   .title h2{font-size:24px}
 }
 
+/* NF-e */
+.nfbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:14px 0 0;padding:12px 16px;background:#fff;border-radius:14px;box-shadow:var(--sh);font-size:13px;color:var(--mut)}
+.nfbar b{color:#1d1d1f;font-weight:600}
+.nfbar .x{margin-left:auto;border:0;background:#f0f0f3;border-radius:50%;width:26px;height:26px;cursor:pointer;color:var(--mut)}
+.nfm{width:860px;max-height:84vh;overflow:auto}
+.nfm table{width:100%;font-size:13px;border-collapse:collapse}
+.nfm td,.nfm th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.nfm th{font-size:11px;color:var(--mut);font-weight:500}
+.nfm td.n,.nfm th.n{text-align:right;font-variant-numeric:tabular-nums}
+.nfm select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:13px inherit;font-family:inherit;background:#fff}
+.nfm tr.miss td{background:var(--warn-bg)}
+.nfm tr.ign td{opacity:.45}
+.nfm .src{font-size:11px;color:var(--mut2)}
+.nfm .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 /* faixa da UF */
 .ufstrip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:12px 0 0;padding:9px 14px;background:#fff;border-radius:12px;box-shadow:var(--sh);font-size:12px;color:var(--mut)}
 .ufstrip b{color:#1d1d1f;font-weight:600;font-variant-numeric:tabular-nums}
@@ -362,8 +376,11 @@ tr.row.off .pn{font-weight:400}
         <select class="sel" id="sUf" title="Estado" onchange="NUF=this.value;negSave();renderSim()"></select>
         <button class="btn sec" type="button" onclick="document.querySelector('#tabs [data-tab=negociacao]').click()">Montar mix</button>
         <button class="btn sec" type="button" onclick="simAdd()" id="sAddBtn">+ Cenário</button>
+        <button class="btn" type="button" onclick="$('nfFile').click()">Importar XML de NF-e</button>
+        <input type="file" id="nfFile" accept=".xml,text/xml,application/xml" class="hide" onchange="nfRead(this)">
       </div>
     </div>
+    <div class="nfbar hide" id="sNf"></div>
     <div class="ufstrip" id="sUfBar"></div>
     <div class="scs" id="sC"></div>
     <div class="cond" style="font-size:12px;margin:-6px 0 12px">Índice = margem % ÷ 10. Bonificação: receita zero, custo = CMV + ICMS + frete sobre o valor de tabela, sem PIS/COFINS. Empate = tamanho de pedido (R$) que iguala a margem R$ do Atual com aquela condição.</div>
@@ -450,6 +467,7 @@ tr.row.off .pn{font-weight:400}
   <div class="dh"><button class="x" type="button" onclick="closeAll()" aria-label="Fechar">✕</button><div id="dHead"></div></div>
   <div class="db" id="dBody"></div>
 </aside>
+<div class="modal nfm" id="nfm" role="dialog" aria-modal="true"></div>
 <div class="modal" id="how" role="dialog" aria-modal="true">
   <h3>Como calculamos</h3>
   <p>Formação <b>por dentro</b>: todos os percentuais incidem sobre o <b>preço de venda</b> (nunca sobre o CMV, sem markup).</p>
@@ -1014,7 +1032,7 @@ function renderDrawer(){
 }
 function openRow(pid){OPEN=pid;$('ov').classList.add('on');$('drawer').classList.add('on');$('drawer').setAttribute('aria-hidden','false');renderDrawer();document.querySelectorAll('#pB tr.row').forEach(t=>t.classList.toggle('sel',t.dataset.pid===String(pid)))}
 function openHow(){$('ov').classList.add('on');$('how').classList.add('on')}
-function closeAll(){OPEN=null;$('ov').classList.remove('on');$('drawer').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');$('how').classList.remove('on');document.querySelectorAll('#pB tr.row.sel').forEach(t=>t.classList.remove('sel'))}
+function closeAll(){OPEN=null;$('ov').classList.remove('on');$('drawer').classList.remove('on');$('drawer').setAttribute('aria-hidden','true');$('how').classList.remove('on');$('nfm').classList.remove('on');document.querySelectorAll('#pB tr.row.sel').forEach(t=>t.classList.remove('sel'))}
 
 /* ---------- eventos ---------- */
 $('pB').addEventListener('click',ev=>{if(ev.target.closest('input,button,a'))return;const tr=ev.target.closest('tr.row');if(!tr)return;const pid=tr.dataset.pid;const p=PROD.find(x=>String(x.id)===pid);if(p)openRow(p.id)});
@@ -1250,6 +1268,105 @@ function ufStripHtml(e,items){
     (own?`<span class="w" title="Esses itens usam o frete do cadastro do produto nesta UF">${own} item${own>1?'s':''} com frete próprio</span>`:'')+
     `<a href="#" onclick="document.querySelector('#tabs [data-tab=estados]').click();return false">Editar em Estados ›</a>`}
 
+/* ===== Importar XML de NF-e (100% no navegador) ===== */
+const NFMAP_KEY='laben-nfmap-v1',NFMETA_KEY='laben-nf-v1';
+let NFMAP={};try{NFMAP=JSON.parse(localStorage.getItem(NFMAP_KEY)||'{}')||{}}catch(e){NFMAP={}}
+let NFMETA=null;try{NFMETA=JSON.parse(localStorage.getItem(NFMETA_KEY)||'null')}catch(e){}
+let NFR=null;
+const nfNum=v=>{const n=parseFloat(String(v||'').replace(',','.'));return isFinite(n)?n:0};
+function nfTxt(el,tag){if(!el)return '';const x=el.getElementsByTagNameNS('*',tag)[0]||el.getElementsByTagName(tag)[0];return x?x.textContent.trim():''}
+function nfEl(el,tag){return el?(el.getElementsByTagNameNS('*',tag)[0]||el.getElementsByTagName(tag)[0]||null):null}
+const NF_STOP=new Set(['de','da','do','das','dos','com','e','creme','crema','cr','nut','la','ben','laben','g','gr','kg','pote','un','und','cx','sabor','pt','lancamento','pasta','integral','a','o']);
+const NF_SYN={avellan:'avela',avelan:'avela',avella:'avela',choc:'chocolate',chocolat:'chocolate',vegan:'vegano',vegana:'vegano',morang:'morango',pist:'pistache',ganache:'ganache',amendoben:'amendoim'};
+function nfTokens(t){return fold(t).replace(/(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b/g,' ').replace(/[^a-z0-9]+/g,' ').split(' ').filter(w=>w&&!/^\d+$/.test(w)&&!NF_STOP.has(w)).map(w=>NF_SYN[w]||w)}
+function nfWeight(t){const m=fold(t).match(/(\d+(?:[.,]\d+)?)\s*(kg|gr|g)\b/);if(!m)return null;const n=parseFloat(m[1].replace(',','.'));return Math.round(/kg/.test(m[2])?n*1000:n)}
+function nfMatch(cProd,xProd){
+  const kc='c:'+cProd,kn='n:'+fold(xProd).replace(/\s+/g,' ').trim();
+  if(NFMAP[kc]&&(NFMAP[kc]==='__ign'||PROD.some(p=>p.id===NFMAP[kc])))return {pid:NFMAP[kc],src:'memória'};
+  if(NFMAP[kn]&&(NFMAP[kn]==='__ign'||PROD.some(p=>p.id===NFMAP[kn])))return {pid:NFMAP[kn],src:'memória'};
+  const codes=[String(cProd).replace(/^0+/,'')];const lead=String(xProd).match(/^\s*(\d{3,6})\b/);if(lead)codes.push(lead[1]);
+  for(const c of codes){const p=PROD.find(p=>p.codigo!=null&&String(p.codigo).replace(/^0+/,'')===c);if(p)return {pid:p.id,src:'código'}}
+  const A=new Set(nfTokens(xProd)),wA=nfWeight(xProd),lb=/la ?ben/i.test(fold(xProd)),nut=/\bnut\b/i.test(fold(xProd));
+  let best=null,bs=0;
+  for(const p of PROD){const B=new Set(nfTokens(p.descricao));if(!A.size||!B.size)continue;
+    let inter=0;A.forEach(w=>{if(B.has(w))inter++});let sc=inter/(A.size+B.size-inter);
+    const wB=Math.round(gramVal(p));if(wA!=null&&wB<1e9&&wA!==wB)sc*=0.3;
+    if(lb&&marcaOf(p)==='Laben')sc+=0.08;if(nut&&marcaOf(p)!=='Laben')sc+=0.08;
+    if(sc>bs){bs=sc;best=p}}
+  return bs>=0.5?{pid:best.id,src:'nome '+Math.round(Math.min(bs,1)*100)+'%'}:{pid:'',src:'sem match'}}
+function nfRead(inp){
+  const f=inp.files&&inp.files[0];inp.value='';if(!f)return;
+  const fr=new FileReader();
+  fr.onload=()=>{try{nfParse(String(fr.result))}catch(e){console.error(e);toast('Não foi possível ler este XML de NF-e',1)}};
+  fr.readAsText(f);
+}
+function nfParse(txt){
+  const doc=new DOMParser().parseFromString(txt,'application/xml');
+  if(doc.getElementsByTagName('parsererror').length)throw new Error('xml');
+  const inf=nfEl(doc,'infNFe');if(!inf)throw new Error('sem infNFe');
+  const ide=nfEl(inf,'ide'),dest=nfEl(inf,'dest'),tot=nfEl(inf,'ICMSTot');
+  const meta={cliente:nfTxt(dest,'xNome'),cnpj:nfTxt(dest,'CNPJ')||nfTxt(dest,'CPF'),uf:nfTxt(nfEl(dest,'enderDest'),'UF'),
+    nNF:nfTxt(ide,'nNF'),data:(nfTxt(ide,'dhEmi')||nfTxt(ide,'dEmi')).slice(0,10),
+    vNF:nfNum(nfTxt(tot,'vNF')),vFrete:nfNum(nfTxt(tot,'vFrete')),vDesc:nfNum(nfTxt(tot,'vDesc')),vProd:nfNum(nfTxt(tot,'vProd'))};
+  const rows=[];
+  for(const det of Array.from(inf.getElementsByTagNameNS('*','det'))){const pr=nfEl(det,'prod');if(!pr)continue;
+    const r={cProd:nfTxt(pr,'cProd'),xProd:nfTxt(pr,'xProd'),q:nfNum(nfTxt(pr,'qCom')),vUn:nfNum(nfTxt(pr,'vUnCom')),vProd:nfNum(nfTxt(pr,'vProd')),vDesc:nfNum(nfTxt(pr,'vDesc'))};
+    const m=nfMatch(r.cProd,r.xProd);r.pid=m.pid==='__ign'?'':m.pid;r.ign=m.pid==='__ign';r.src=m.src;rows.push(r)}
+  if(!rows.length)throw new Error('sem itens');
+  NFR={meta,rows};nfReview();
+}
+function nfFmtData(d){const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:d||'—'}
+function nfFmtDoc(c){c=String(c||'');return c.length===14?c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):c}
+function nfReview(){
+  const {meta,rows}=NFR;
+  const opts=pid=>{const by={};for(const p of PROD)(by[marcaNome(marcaOf(p))]=by[marcaNome(marcaOf(p))]||[]).push(p);
+    return `<option value="">— escolher produto —</option><option value="__ign" ${''}>Ignorar esta linha</option>`+Object.keys(by).sort().map(m=>`<optgroup label="${esc(m)}">${by[m].sort((a,b)=>nice(a.descricao).localeCompare(nice(b.descricao),'pt-BR')).map(p=>`<option value="${p.id}" ${p.id===pid?'selected':''}>${esc(nice(p.descricao))}${p.codigo?' · '+esc(p.codigo):''}</option>`).join('')}</optgroup>`).join('')};
+  const nMiss=rows.filter(r=>!r.pid&&!r.ign).length;
+  const hasUf=EST.some(e=>e.uf===meta.uf);
+  $('nfm').innerHTML=`<h3>Conferir NF-e ${esc(meta.nNF)}</h3>
+    <p><b>${esc(meta.cliente||'—')}</b> · ${esc(nfFmtDoc(meta.cnpj))} · ${esc(meta.uf||'—')}${hasUf?'':' <span class="c-bad">(UF sem cadastro)</span>'} · ${nfFmtData(meta.data)} · ${brl(meta.vNF)} · lido só no seu navegador</p>
+    <table><thead><tr><th>Item da nota</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Desc.</th><th style="width:300px">Produto do painel</th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr class="${r.ign?'ign':!r.pid?'miss':''}"><td><div>${esc(r.xProd)}</div><div class="src">cód. ${esc(r.cProd)} · ${esc(r.ign?'ignorado':r.src)}</div></td>
+      <td class="n">${fmtIn(r.q)}</td><td class="n">${brl(r.vUn)}</td><td class="n">${r.vDesc?brl(r.vDesc):'—'}</td>
+      <td><select onchange="nfPick(${i},this.value)">${opts(r.pid).replace(r.ign?'value="__ign" ':'@@','value="__ign" selected ')}</select></td></tr>`).join('')}
+    </tbody></table>
+    <p style="margin-top:10px">${nMiss?`<span class="c-warn">${nMiss} linha${nMiss>1?'s':''} sem produto — não entram no cálculo até serem mapeadas.</span> `:''}Os mapeamentos confirmados ficam salvos neste navegador para os próximos XMLs.</p>
+    <div class="acts"><button class="btn sec" onclick="closeAll()">Cancelar</button><button class="btn" onclick="nfConfirm()" ${hasUf?'':'disabled'}>Carregar no simulador</button></div>`;
+  $('ov').classList.add('on');$('nfm').classList.add('on');
+}
+function nfPick(i,v){const r=NFR.rows[i];r.ign=v==='__ign';r.pid=r.ign?'':v;r.src=r.ign?'ignorado':(v?'manual':'sem match');nfReview()}
+function nfConfirm(){
+  const {meta,rows}=NFR;
+  /* memoriza mapeamentos confirmados */
+  for(const r of rows){if(!r.pid&&!r.ign)continue;const v=r.ign?'__ign':r.pid;NFMAP['c:'+r.cProd]=v;NFMAP['n:'+fold(r.xProd).replace(/\s+/g,' ').trim()]=v}
+  localStorage.setItem(NFMAP_KEY,JSON.stringify(NFMAP));
+  /* rateio do desconto total que não estiver nos itens */
+  const sumProd=rows.reduce((a,r)=>a+r.vProd,0),sumDesc=rows.reduce((a,r)=>a+r.vDesc,0);
+  const rest=Math.max(0,(meta.vDesc||0)-sumDesc);
+  const agg={};
+  for(const r of rows){if(!r.pid||r.ign||r.q<=0)continue;const d=r.vDesc+(sumProd?rest*r.vProd/sumProd:0);
+    const a=agg[r.pid]=agg[r.pid]||{q:0,v:0};a.q+=r.q;a.v+=r.vProd-d}
+  NUF=meta.uf;
+  const fl=faixasUf(NUF);let ord=fl.length?fl[0].ordem:1;for(const f of fl){if((Number(f.pedido_de)||0)<=meta.vNF)ord=f.ordem}
+  NFAIXA=ord;MARCA='';LINHA='';EMB=0;if($('nQ'))$('nQ').value='';
+  NEG=Object.entries(agg).map(([pid,a])=>({pid,qtd:Math.round(a.q*1000)/1000,preco:Math.round(a.v/a.q*10000)/10000}));
+  const semPreco=NEG.filter(it=>!preRow(NUF,it.pid)).length;
+  negSave();
+  const cli=(meta.cliente||'cliente').split(/\s+/).slice(0,3).join(' ');
+  SIMA=simNew({nome:`Faturado NF ${meta.nNF} · ${cli}`,faixa:'esp'});
+  const c1=simNew({nome:'Cenário 1 · tabela',faixa:'cur'});if(SIM.length)SIM[0]=c1;else SIM.push(c1);
+  simSave();
+  NFMETA=Object.assign({},meta,{ign:rows.filter(r=>r.ign).length,miss:rows.filter(r=>!r.pid&&!r.ign).length,semPreco});
+  localStorage.setItem(NFMETA_KEY,JSON.stringify(NFMETA));
+  closeAll();renderSim();
+  toast(`NF ${meta.nNF} carregada · ${NEG.length} produto${NEG.length===1?'':'s'}`+(semPreco?` · ${semPreco} sem preço na UF`:''));
+}
+function nfClear(){NFMETA=null;localStorage.removeItem(NFMETA_KEY);renderSim()}
+function nfBarHtml(){
+  if(!NFMETA)return '';const m=NFMETA;
+  const extra=[m.vDesc?'desconto '+brl(m.vDesc):'',m.vFrete?'frete na nota '+brl(m.vFrete):'',m.ign?m.ign+' linha(s) ignorada(s)':'',m.miss?`<span class="c-warn">${m.miss} sem produto</span>`:'',m.semPreco?`<span class="c-warn">${m.semPreco} sem preço na UF</span>`:''].filter(Boolean).join(' · ');
+  return `<span><b>${esc(m.cliente||'—')}</b> · ${esc(nfFmtDoc(m.cnpj))}</span><span>NF <b>${esc(m.nNF)}</b> · ${nfFmtData(m.data)}</span><span>Valor <b>${brl(m.vNF)}</b> · ${esc(m.uf)}</span>${extra?`<span>${extra}</span>`:''}<button class="x" title="Fechar resumo da nota" onclick="nfClear()">×</button>`}
+
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
 function simRun(items,e,s,hasEsp){
   const fx=simFx(s,hasEsp);const ord=typeof fx==='number'?fx:NFAIXA;
@@ -1272,6 +1389,7 @@ function renderSim(){
   $('sUf').innerHTML=EST.slice().sort((a,b)=>a.uf.localeCompare(b.uf)).map(e=>`<option value="${e.uf}" ${e.uf===NUF?'selected':''}>${e.uf} · ${esc(e.nome)}</option>`).join('');
   $('sAddBtn').classList.toggle('hide',SIM.length>=3);
   const {e,items}=simItems();
+  $('sNf').innerHTML=nfBarHtml();$('sNf').classList.toggle('hide',!NFMETA);
   $('sUfBar').innerHTML=ufStripHtml(EST.find(x=>x.uf===NUF),items);
   const fxl=faixasUf(NUF);const fxName=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
   const fxShort=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'Faixa R$'+Number(f.pedido_de).toLocaleString('pt-BR'):'Faixa '+o};
@@ -1309,7 +1427,7 @@ function renderSim(){
         <dt>Índice</dt><dd><span class="pill ${ip==null?'na':ip<0?'bad':ip<0.10?'warn':'ok'}">${idx(ip)}</span></dd>
         <dt>Volume</dt><dd>${r.k.toLocaleString('pt-BR',{maximumFractionDigits:2})}×</dd>
         ${r.bonV?`<dt>Bonificado (tabela)</dt><dd>${brl(r.bonV)}</dd><dt>Custo bonificação</dt><dd>${brl(r.bonC)}</dd>`:''}
-        <dt>Desconto percebido</dt><dd>${r.perc==null?'—':pct(r.perc)}</dd>
+        <dt>Desconto percebido</dt><dd>${r.perc==null?'—':r.perc<-0.0005?'<span class="muted">'+pct(-r.perc)+' acima da tabela</span>':pct(r.perc)}</dd>
         ${isA?'':`<dt>vs Atual</dt><dd class="${dm<0?'c-bad':'c-ok'}">${sg(dm)}</dd>
         <dt>Empate</dt><dd>${be==null?'não empata':brl(be)+' <span class="muted">('+(be/A.rec).toLocaleString('pt-BR',{maximumFractionDigits:2})+'×)</span>'}</dd>`}
       </dl>
