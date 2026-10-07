@@ -414,7 +414,7 @@ tr.row.off .pn{font-weight:400}
     <li>Custo total = CMV + ICMS + PIS + COFINS + frete + comissão/degustação</li>
     <li><b>Margem = preço − custo total</b></li>
   </ol>
-  <p style="margin-bottom:6px">Cores da margem: <span class="pill ok">≥ 10%</span> <span class="pill warn">0–10%</span> <span class="pill bad">&lt; 0</span> <span class="pill na">sem dados</span></p>
+  <p style="margin-bottom:6px">Cores do índice (margem % ÷ 10): <span class="pill ok">≥ 1,0</span> <span class="pill warn">0–1,0</span> <span class="pill bad">&lt; 0</span> <span class="pill na">sem dados</span></p>
   <p class="muted">Modelo conferido: formação por dentro · Lucro Real · ICMS interestadual sobre preço · sem DIFAL B2B contribuinte · origem SP. Quando a faixa não tem preço, usamos o preço de tabela (marcado como <span class="tagt">tabela</span>). Clique em qualquer produto para ver a composição completa.</p>
   <div style="text-align:right;margin-top:12px"><button class="btn" type="button" onclick="closeAll()">Entendi</button></div>
 </div>
@@ -432,6 +432,7 @@ let CMVF='',TAB='precos',NUF='SP',NFAIXA=1,NEG=[],AN={},ANP={};
 const $=id=>document.getElementById(id);
 const brl=v=>v==null||isNaN(v)?'—':v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const idx=v=>v==null||!isFinite(v)?'—':(v*10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
 const pct0=v=>v==null||!isFinite(v)?'—':(v*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=s=>{if(s==null)return null;s=String(s).trim();if(s==='')return null;s=s.replace(/[R$\s%]/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=parseFloat(s);return isNaN(n)?NaN:n};
@@ -743,7 +744,7 @@ function calc(p,r,e0,ord,pfOv){
   return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv,custos,m,mp:pf?m/pf:null,fromTabela,carga};
 }
 function mClass(c){if(c.m==null||c.mp==null)return 'na';if(c.mp<0)return 'bad';if(c.mp<0.10)return 'warn';return 'ok'}
-function pillHtml(c){const k=mClass(c);return k==='na'?'<span class="pill na">sem dados</span>':`<span class="pill ${k}">${pct(c.mp)}</span>`}
+function pillHtml(c){const k=mClass(c);return k==='na'?'<span class="pill na">sem dados</span>':`<span class="pill ${k}">${idx(c.mp)}</span>`}
 
 /* seletor de estado */
 function renderUfPicker(){
@@ -812,14 +813,14 @@ function renderPre(){
   const avgCls=avg==null?'c-mut':avg<0?'c-bad':avg<0.10?'c-warn':'c-ok';
   $('pK').innerHTML=`
     <div class="kpi"><span>Produtos${MARCA?' · '+esc(marcaNome(MARCA)):''}</span><b>${rows.length}</b><small>${nSem?nSem+' sem dados':'todos com preço e CMV'}</small></div>
-    <div class="kpi"><span>Margem média</span><b class="${avgCls}">${pct(avg)}</b><small>ponderada pelo preço</small></div>
+    <div class="kpi"><span>Índice médio</span><b class="${avgCls}">${idx(avg)}</b><small>ponderada pelo preço</small></div>
     <div class="kpi"><span>CMV médio</span><b>${pct(cmvPct)}</b><small>do preço · ${brl(cmvMed)} por unidade</small></div>
-    <div class="kpi"><span>Abaixo de 10%</span><b class="${nLow?'c-warn':'c-mut'}">${nLow}</b><small>margem entre 0% e 10%</small></div>
+    <div class="kpi"><span>Abaixo de 1,0</span><b class="${nLow?'c-warn':'c-mut'}">${nLow}</b><small>índice entre 0 e 1,0</small></div>
     <div class="kpi"><span>Negativas</span><b class="${nNeg?'c-bad':'c-mut'}">${nNeg}</b><small>preço não cobre os custos</small></div>`;
   /* cabeçalho */
   const fxs=faixasUf(UF);
   const fn=o=>{const f=fxs.find(x=>x.ordem===o);return 'F'+o+(f?'':'')};
-  $('pH').innerHTML=`<tr><th>Produto</th><th class="n">Preço</th><th class="n" title="Custo do produto">CMV</th><th class="n" title="ICMS + PIS + COFINS + frete + comissão + degustação, sobre o preço">Custos variáveis</th><th class="n">Margem R$</th><th class="n">Margem %</th>${EDIT?`<th class="n ed">Frete %</th><th class="n ed">${fn(1)}</th><th class="n ed">${fn(2)}</th><th class="n ed">${fn(3)}</th>`:''}</tr>`;
+  $('pH').innerHTML=`<tr><th>Produto</th><th class="n">Preço</th><th class="n" title="Custo do produto">CMV</th><th class="n" title="ICMS + PIS + COFINS + frete + comissão + degustação, sobre o preço">Custos variáveis</th><th class="n">Margem R$</th><th class="n">Índice</th>${EDIT?`<th class="n ed">Frete %</th><th class="n ed">${fn(1)}</th><th class="n ed">${fn(2)}</th><th class="n ed">${fn(3)}</th>`:''}</tr>`;
   const cols=EDIT?10:6;
   /* agrupamento por linha, ordenado por gramatura */
   const groups={};rows.forEach(x=>(groups[x.ln]=groups[x.ln]||[]).push(x));
@@ -830,7 +831,7 @@ function renderPre(){
   for(const g of gk){
     const list=groups[g].sort((a,b)=>embOf(a.p)-embOf(b.p)||a.p._i-b.p._i);
     const gd=list.filter(x=>x.c.m!=null);const gs=gd.reduce((a,x)=>a+x.c.pf,0);const gmp=gs?gd.reduce((a,x)=>a+x.c.m,0)/gs:null;const gc=gd.reduce((a,x)=>a+x.c.cmv,0);const gcp=gs?gc/gs:null;const gcm=gd.length?gc/gd.length:null;
-    html+=`<tr class="grp"><td colspan="${cols}">${esc(g)}<span class="gm">${list.length} produto${list.length>1?'s':''} · margem média <span class="${gmp==null?'':gmp<0?'c-bad':gmp<0.10?'c-warn':'c-ok'}">${pct(gmp)}</span> · CMV médio ${pct(gcp)} (${brl(gcm)})</span></td></tr>`;
+    html+=`<tr class="grp"><td colspan="${cols}">${esc(g)}<span class="gm">${list.length} produto${list.length>1?'s':''} · índice médio <span class="${gmp==null?'':gmp<0?'c-bad':gmp<0.10?'c-warn':'c-ok'}">${idx(gmp)}</span> · CMV médio ${pct(gcp)} (${brl(gcm)})</span></td></tr>`;
     for(const {p,r,c} of list){
       const inp=(f,isPct)=>`<input inputmode="decimal" data-id="${r.id}" data-f="${f}" data-pct="${isPct?1:0}" class="${(r.id+'|'+f) in dPre?'dirty':''}" value="${isPct?(val(r,f)==null?'':fmtIn(val(r,f)*100)):fmtIn(val(r,f))}" placeholder="—" onchange="editPre(this)">`;
       const frInp=(()=>{const raw=val(r,'frete_cif');const eff=raw!=null?raw:(e.frete_pct==null?null:Number(e.frete_pct));const dirty=(r.id+'|frete_cif') in dPre;return `<input inputmode="decimal" data-id="${r.id}" data-f="frete_cif" data-pct="1" class="${dirty?'dirty':''}" value="${eff==null?'':fmtIn(eff*100)}" placeholder="${e.frete_pct==null?'—':fmtIn(Number(e.frete_pct)*100)+' (UF)'}" title="${raw==null&&e.frete_pct!=null?'Herdado do estado':'Frete do produto'}" onchange="editPre(this)">`})();
@@ -936,13 +937,13 @@ function renderDrawer(){
   const pf=c.pf,base=Math.max(pf,c.custos);
   const segs=[['CMV',c.cmv,'--c-cmv'],['Impostos',c.im||0,'--c-imp'],['Frete',c.fr||0,'--c-fr'],['Comissão/Degust.',c.vv||0,'--c-vv'],['Margem',Math.max(c.m,0),'--c-m']];
   const bar=segs.filter(s=>s[1]>0).map(s=>`<i style="width:${(s[1]/base*100).toFixed(2)}%;background:var(${s[2]})" title="${s[0]} ${brl(s[1])}"></i>`).join('');
-  const leg=segs.map(s=>`<span style="--c:var(${s[2]})">${s[0]} ${pct(s[1]/pf)}</span>`).join('');
+  const leg=segs.map(s=>`<span style="--c:var(${s[2]})">${s[0]} ${s[0]==='Margem'?'índice '+idx(s[1]/pf):pct(s[1]/pf)}</span>`).join('');
   const line=(lab,p_,v,col)=>`<tr class="minus"><td><i style="--c:var(${col})"></i>− ${lab}</td><td class="p">${p_==null?'—':pct0(p_)}</td><td class="v">${v==null?'—':'− '+brl(v)}</td></tr>`;
   const mk=mClass(c);
   const frSrc=anVal(UF,'frete_pct')!=null?'análise':(val(r,'frete_cif')!=null?'do produto':(e0.frete_pct!=null?'do estado':'não definido'));
   $('dBody').innerHTML=`
     ${anBox}
-    <div class="big"><div><div class="muted">Preço de venda</div><div class="v">${brl(pf)}</div></div><div style="text-align:right"><div class="muted">Margem</div><span class="pill ${mk}" style="font-size:15px;padding:5px 12px">${pct(c.mp)}</span></div></div>
+    <div class="big"><div><div class="muted">Preço de venda</div><div class="v">${brl(pf)}</div></div><div style="text-align:right"><div class="muted">Índice</div><span class="pill ${mk}" style="font-size:15px;padding:5px 12px">${idx(c.mp)}</span></div></div>
     ${c.m<0?`<div class="warnbox" style="background:var(--bad-bg);color:var(--bad)">Os custos superam o preço em ${brl(-c.m)} por unidade.</div>`:''}
     <div class="stack">${bar}</div>
     <div class="legend">${leg}</div>
@@ -954,7 +955,7 @@ function renderDrawer(){
       ${line('Frete',c.frPct,c.fr,'--c-fr')}
       ${line('Comissão + degustação',c.cd,c.vv,'--c-vv')}
       ${line('CMV',c.cmv/pf,c.cmv,'--c-cmv')}
-      <tr class="tot"><td>= Margem</td><td class="p ${c.m<0?'c-bad':''}">${pct(c.mp)}</td><td class="v ${c.m<0?'c-bad':'c-ok'}">${brl(c.m)}</td></tr>
+      <tr class="tot"><td>= Margem <span class="muted">(índice)</span></td><td class="p ${c.m<0?'c-bad':''}">${idx(c.mp)}</td><td class="v ${c.m<0?'c-bad':'c-ok'}">${brl(c.m)}</td></tr>
       <tr class="sub"><td>Custo total</td><td class="p">${pct(c.custos/pf)}</td><td class="v">${brl(c.custos)}</td></tr>
     </table>
     <div class="meta">
@@ -1103,20 +1104,20 @@ function renderNeg(){
   const mp=rec?mT/rec:null;
   const mT2=mT-bonC,mp2=rec?mT2/rec:null;
   const dp=(rec+bonV)?bonV/(rec+bonV):null;
-  const pp=mp!=null&&mp2!=null?(mp2-mp)*100:null;
+  const pp=mp!=null&&mp2!=null?(mp2-mp)*10:null;
   const cls=x=>x==null?'c-mut':x<0?'c-bad':x<0.10?'c-warn':'c-ok';
-  const ppf=x=>x==null?'—':(x>0?'+':'')+x.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' p.p.';
+  const ppf=x=>x==null?'—':(x>0?'+':'')+x.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'';
   $('nK').innerHTML=`
     <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>${nSel} produto${nSel===1?'':'s'} · ${fmtIn(unT)} un.${bonQ?' + '+fmtIn(bonQ)+' bonif.':''}${nHid?` · <span title="Marcados fora do filtro atual não entram no total">${nHid} oculto${nHid>1?'s':''} no filtro</span>`:''} · <a href="#" onclick="negClear();return false" style="color:var(--mut)">limpar</a></small></div>
     <div class="kpi"><span>Valor bonificado</span><b>${brl(bonV||null)}</b><small>${bonQ?fmtIn(bonQ)+' un. a preço de tabela':'sem bonificação'}</small></div>
     <div class="kpi"><span>Desconto percebido</span><b>${bonV?pct(dp):'—'}</b><small>bonif. ÷ (receita + bonif.)</small></div>
     <div class="kpi"><span>Custo real da bonificação</span><b>${brl(bonC||null)}</b><small>CMV + ICMS + frete</small></div>
-    <div class="kpi"><span>Margem do pedido</span><b class="${cls(mp2)}">${pct(mp2)}</b><small>${bonV?`sem bonif. ${pct(mp)} · ${brl(mT)} → ${brl(mT2)} · <span style="color:var(--bad);font-weight:600">${ppf(pp)}</span>`:brl(mT||null)}</small></div>`;
+    <div class="kpi"><span>Índice do pedido</span><b class="${cls(mp2)}">${idx(mp2)}</b><small>${bonV?`sem bonif. ${idx(mp)} · ${brl(mT)} → ${brl(mT2)} · <span style="color:var(--bad);font-weight:600">impacto ${ppf(pp)}</span>`:brl(mT||null)}</small></div>`;
   $('nK').style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
   $('nPrem').textContent=`Bonificação: receita zero · custo = CMV + ICMS ${pct0(e.imposto_pct)} e frete sobre o preço de tabela · sem PIS/COFINS · comissão e degustação não incidem.`;
   $('nChip').textContent=nSel+' no pedido'+(nHid?` (+${nHid} oculto${nHid>1?'s':''})`:'')+(rec?` · ${brl(rec)}`:'');
 
-  $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Qtd bonificada</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Margem %</th></tr>`;
+  $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Qtd bonificada</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Índice</th></tr>`;
 
   if(!catalog.length){
     $('nB').innerHTML=`<tr><td colspan="10" class="empty"><b>Nenhum produto neste filtro</b>Ajuste marca, linha, embalagem ou busca.</td></tr>`;
