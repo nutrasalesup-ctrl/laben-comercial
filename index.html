@@ -1085,8 +1085,11 @@ function renderNeg(){
 
   const catalog=negCatalog();
   /* KPIs from selected mix (all selected, not only filtered) */
-  let rec=0,cmvT=0,varT=0,mT=0,ok=0,nSel=0,bonV=0,bonC=0,bonQ=0;
+  let rec=0,cmvT=0,varT=0,mT=0,ok=0,nSel=0,bonV=0,bonC=0,bonQ=0,unT=0;
+  const visIds=new Set(catalog.map(x=>x.p.id));
+  const nHid=NEG.filter(it=>!visIds.has(it.pid)).length;
   for(const it of NEG){
+    if(!visIds.has(it.pid))continue;
     const p=PROD.find(x=>x.id===it.pid);if(!p)continue;
     const r=preRow(NUF,p.id)||{id:'tmp_'+p.id,uf:NUF,produto_id:p.id};
     const pf=it.preco==null?precoFaixa(r,NFAIXA,p):Number(it.preco);
@@ -1095,7 +1098,7 @@ function renderNeg(){
     if(bq>0){const tab=precoFaixa(r,NFAIXA,p);const ct=calc(p,r,e,NFAIXA,tab);
       if(tab!=null&&ct.cmv!=null){bonQ+=bq;bonV+=tab*bq;bonC+=(ct.cmv+tab*(ct.imPct||0)+tab*(ct.frPct||0))*bq}}
     if(c.pf==null||q<=0)continue;
-    rec+=c.pf*q;if(c.cmv!=null)cmvT+=c.cmv*q;if(c.custos!=null&&c.cmv!=null)varT+=(c.custos-c.cmv)*q;if(c.m!=null){mT+=c.m*q;ok++}
+    unT+=q;rec+=c.pf*q;if(c.cmv!=null)cmvT+=c.cmv*q;if(c.custos!=null&&c.cmv!=null)varT+=(c.custos-c.cmv)*q;if(c.m!=null){mT+=c.m*q;ok++}
   }
   const mp=rec?mT/rec:null;
   const mT2=mT-bonC,mp2=rec?mT2/rec:null;
@@ -1104,14 +1107,14 @@ function renderNeg(){
   const cls=x=>x==null?'c-mut':x<0?'c-bad':x<0.10?'c-warn':'c-ok';
   const ppf=x=>x==null?'—':(x>0?'+':'')+x.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' p.p.';
   $('nK').innerHTML=`
-    <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>${nSel} itens · preço × qtd</small></div>
+    <div class="kpi"><span>Receita do pedido</span><b>${brl(rec||null)}</b><small>${nSel} produto${nSel===1?'':'s'} · ${fmtIn(unT)} un.${bonQ?' + '+fmtIn(bonQ)+' bonif.':''}${nHid?` · <span title="Marcados fora do filtro atual não entram no total">${nHid} oculto${nHid>1?'s':''} no filtro</span>`:''} · <a href="#" onclick="negClear();return false" style="color:var(--mut)">limpar</a></small></div>
     <div class="kpi"><span>Valor bonificado</span><b>${brl(bonV||null)}</b><small>${bonQ?fmtIn(bonQ)+' un. a preço de tabela':'sem bonificação'}</small></div>
     <div class="kpi"><span>Desconto percebido</span><b>${bonV?pct(dp):'—'}</b><small>bonif. ÷ (receita + bonif.)</small></div>
     <div class="kpi"><span>Custo real da bonificação</span><b>${brl(bonC||null)}</b><small>CMV + ICMS + frete</small></div>
     <div class="kpi"><span>Margem do pedido</span><b class="${cls(mp2)}">${pct(mp2)}</b><small>${bonV?`sem bonif. ${pct(mp)} · ${brl(mT)} → ${brl(mT2)} · <span style="color:var(--bad);font-weight:600">${ppf(pp)}</span>`:brl(mT||null)}</small></div>`;
   $('nK').style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
   $('nPrem').textContent=`Bonificação: receita zero · custo = CMV + ICMS ${pct0(e.imposto_pct)} e frete sobre o preço de tabela · sem PIS/COFINS · comissão e degustação não incidem.`;
-  $('nChip').textContent=nSel+' no pedido'+(rec?` · ${brl(rec)}`:'');
+  $('nChip').textContent=nSel+' no pedido'+(nHid?` (+${nHid} oculto${nHid>1?'s':''})`:'')+(rec?` · ${brl(rec)}`:'');
 
   $('nH').innerHTML=`<tr><th class="ck"></th><th>Produto</th><th class="n">Tabela</th><th class="n">Qtd</th><th class="n">Qtd bonificada</th><th class="n">Preço negociado</th><th class="n">CMV</th><th class="n">Custos var.</th><th class="n">Margem R$</th><th class="n">Margem %</th></tr>`;
 
