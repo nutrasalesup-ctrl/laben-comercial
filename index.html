@@ -290,6 +290,48 @@ tr.row.off .pn{font-weight:400}
 .btn.tiny{padding:6px 12px;font-size:12px;border-radius:8px}
 
 
+/* ---- CRM / Fornecedores / Representantes ---- */
+.rel-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.rel-grid{grid-template-columns:1fr}}
+.rel-list{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.rel-list .hd .btn{white-space:nowrap}.rel-list .hd{padding:12px;display:flex;gap:8px;border-bottom:1px solid var(--line)}
+.rel-list input[type=search]{flex:1;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;background:#f5f5f7}
+.rel-list .fl{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.rel-list .fl button{border:0;background:#f0f0f2;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--mut)}
+.rel-list .fl button.on{background:#1d1d1f;color:#fff}
+.rel-it{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.rel-it:hover{background:#f7f7f9}.rel-it.on{background:var(--acc-bg)}
+.rel-it b{font-weight:600;font-size:14px}.rel-it small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.st{font-size:11px;border-radius:999px;padding:2px 8px;white-space:nowrap;align-self:flex-start;background:#f0f0f2;color:var(--mut)}
+.st.prospect,.st.cotacao,.st.negociacao{background:#fff4e0;color:#a35a00}.st.ativo{background:#e3f6e8;color:#1b7f3b}.st.inativo{background:#eee;color:#888}
+.rel-det{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:18px 20px;min-height:300px}
+.rel-det h3{margin:0;font-size:20px;letter-spacing:-.01em}
+.rel-meta{color:var(--mut);font-size:13px;margin:4px 0 12px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.qf{background:#f5f5f7;border-radius:14px;padding:12px;margin:10px 0 16px;display:grid;gap:8px}
+.qf .row{display:flex;gap:8px;flex-wrap:wrap}
+.qf input,.qf textarea,.qf select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;background:#fff;min-width:0}
+.qf textarea{min-height:54px;resize:vertical;width:100%;box-sizing:border-box}
+.qf .grow{flex:1 1 180px}
+.chs{display:inline-flex;background:#e8e8ed;border-radius:10px;padding:2px}
+.chs button{border:0;background:transparent;padding:6px 10px;border-radius:8px;font-size:13px;cursor:pointer;color:#1d1d1f}
+.chs button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tl{position:relative;margin-left:8px;border-left:2px solid var(--line);padding-left:16px}
+.tl-it{position:relative;margin-bottom:14px}
+.tl-it:before{content:'';position:absolute;left:-22px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--acc);border:2px solid #fff}
+.tl-it .h{font-size:12px;color:var(--mut)}.tl-it .b{font-size:14px;margin-top:2px;white-space:pre-wrap}
+.tl-it .np{font-size:13px;margin-top:4px;color:#1d1d1f}.tl-it .np.done{color:var(--mut);text-decoration:line-through}
+.tl-it .acts{margin-top:4px;display:flex;gap:10px}.tl-it .acts a{font-size:12px;color:var(--acc);cursor:pointer}
+.pp{background:#fff;border-radius:var(--r);box-shadow:var(--sh);margin-bottom:16px;overflow:hidden}
+.pp h4{margin:0;padding:12px 16px;font-size:14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.pp-it{display:grid;grid-template-columns:96px 1fr auto;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);align-items:center;font-size:14px}
+.pp-it:last-child{border-bottom:0}.pp-it .d{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+.pp-it.late{background:#fff3f2}.pp-it.late .d{color:var(--bad);font-weight:600}.pp-it.today .d{color:#a35a00;font-weight:600}
+.pp-it .who{font-size:12px;color:var(--mut)}.pp-it button{border:0;background:#f0f0f2;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+.ef{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:8px 0}
+.ef label{font-size:12px;color:var(--mut);display:grid;gap:3px}
+.ef input,.ef select,.ef textarea{border:1px solid var(--line);border-radius:10px;padding:7px 9px;font:inherit;font-size:14px;color:#1d1d1f}
+.cmpq{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.cmpq th,.cmpq td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+.cmpq td.n{text-align:right;font-variant-numeric:tabular-nums}.cmpq tr.best td{background:#eef8f0}
 </style>
 </head>
 <body>
@@ -302,6 +344,9 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="negociacao">Negociação</button>
       <button data-tab="simulador">Simulador</button>
       <button data-tab="estados">Estados</button>
+      <button data-tab="crm">CRM</button>
+      <button data-tab="forn">Fornecedores</button>
+      <button data-tab="rep">Representantes</button>
     </nav>
     <div class="hright">
       <div class="seg sm" id="empSeg" title="Empresa emissora"></div>
@@ -468,6 +513,21 @@ tr.row.off .pn{font-weight:400}
   </section>
 
   <!-- ESTADOS -->
+  <section id="tab-crm" class="hide">
+    <h2 class="ptitle">CRM</h2>
+    <p class="psub">Clientes B2B, contatos, propostas e próximos passos.</p>
+    <div id="rel-crm"></div>
+  </section>
+  <section id="tab-forn" class="hide">
+    <h2 class="ptitle">Fornecedores</h2>
+    <p class="psub">Compras: cotações, contatos e comparativo de preços por item.</p>
+    <div id="rel-forn"></div>
+  </section>
+  <section id="tab-rep" class="hide">
+    <h2 class="ptitle">Representantes</h2>
+    <p class="psub">Representantes comerciais por região, contatos e próximos passos.</p>
+    <div id="rel-rep"></div>
+  </section>
   <section id="tab-estados" class="hide">
     <h2 class="ptitle">Estados</h2>
     <p class="psub">ICMS, PIS/COFINS, frete e condições comerciais por UF (origem SP).</p>
@@ -577,9 +637,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao','simulador'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);
 });
 
 async function fetchAll(table,orderBy){
@@ -1656,6 +1716,105 @@ function renderSim(){
 }
 negLoad();
 loadAll();
+/* ---------- Relacionamento: CRM · Fornecedores · Representantes ---------- */
+const CANAIS=[['whatsapp','WhatsApp'],['ligacao','Ligação'],['visita','Visita'],['email','E-mail'],['outro','Outro']];
+const canalNome=v=>(CANAIS.find(c=>c[0]===v)||[,v||'—'])[1];
+const REL_CFG={
+  crm:{t:'clientes',ct:'contatos',fk:'cliente_id',ent:'cliente',Ent:'Cliente',plural:'clientes',
+    st:[['prospect','Prospect'],['ativo','Ativo'],['inativo','Inativo']],
+    f:[['nome','Nome'],['contato','Contato'],['telefone','Telefone'],['cnpj','CNPJ'],['cidade','Cidade'],['uf','UF'],['empresa_faturamento','Empresa',[['','—'],['nutrissima','Nutríssima'],['lbr','LBR']]],['fornecedor_atual','Fornecedor atual / concorrente'],['obs','Observações','ta']],
+    sub:x=>[x.contato,[x.cidade,x.uf].filter(Boolean).join('/'),x.empresa_faturamento?(x.empresa_faturamento==='lbr'?'LBR':'Nutríssima'):''],
+    cx:[['valor_proposta','Valor da proposta R$','num'],['status','Negócio',[['aberto','Aberto'],['fechado','Fechado'],['perdido','Perdido']]]]},
+  forn:{t:'fornecedores',ct:'contatos_fornecedor',fk:'fornecedor_id',ent:'fornecedor',Ent:'Fornecedor',plural:'fornecedores',
+    st:[['cotacao','Em cotação'],['ativo','Ativo'],['inativo','Inativo']],
+    f:[['nome','Nome'],['categoria','Categoria',[['materia_prima','Matéria-prima'],['embalagem','Embalagem'],['etiqueta','Etiqueta'],['servico','Serviço'],['outro','Outro']]],['contato','Contato'],['telefone','Telefone'],['email','E-mail'],['cidade','Cidade'],['uf','UF'],['obs','Observações','ta']],
+    sub:x=>[x.contato,relOpt('forn','categoria',x.categoria),[x.cidade,x.uf].filter(Boolean).join('/')],
+    cx:[['item_cotado','Item cotado'],['preco_cotado','Preço R$','num'],['unidade','Unidade'],['prazo_entrega','Prazo de entrega'],['pedido_minimo','Pedido mínimo']]},
+  rep:{t:'representantes',ct:'contatos_representante',fk:'representante_id',ent:'representante',Ent:'Representante',plural:'representantes',
+    st:[['prospect','Prospect'],['negociacao','Em negociação'],['ativo','Ativo'],['inativo','Inativo']],
+    f:[['nome','Nome'],['empresa','Empresa'],['telefone','Telefone'],['email','E-mail'],['cidade','Cidade'],['ufs_atendidas','UFs atendidas'],['regiao','Região'],['comissao_pct','Comissão %','pct'],['obs','Observações','ta']],
+    sub:x=>[x.empresa,x.cidade,x.ufs_atendidas?'UFs '+x.ufs_atendidas:'',x.comissao_pct!=null?'comissão '+pct0(Number(x.comissao_pct)):''],cx:[]}
+};
+const REL={};for(const k in REL_CFG)REL[k]={rows:[],cts:[],sel:null,q:'',fs:'',edit:false,canal:'whatsapp',loaded:false};
+function relOpt(k,f,v){const d=REL_CFG[k].f.find(x=>x[0]===f);const o=d&&Array.isArray(d[2])?d[2].find(x=>x[0]===v):null;return o?o[1]:(v||'')}
+const relStNome=(k,v)=>(REL_CFG[k].st.find(s=>s[0]===v)||[,v])[1];
+const hojeISO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fDia=s=>{if(!s)return '—';const [y,m,d]=String(s).slice(0,10).split('-');return d+'/'+m+(y!==String(new Date().getFullYear())?'/'+y:'')};
+const fDH=s=>{const d=new Date(s);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})+' · '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})};
+async function relLoad(k){const c=REL_CFG[k],S=REL[k];
+  const [a,b]=await Promise.all([sb.from(c.t).select('*').order('nome'),sb.from(c.ct).select('*').order('data_hora',{ascending:false})]);
+  if(a.error||b.error){toast('Erro ao carregar '+c.plural+': '+(a.error||b.error).message,1);return}
+  S.rows=a.data||[];S.cts=b.data||[];S.loaded=true;if(S.sel&&!S.rows.some(r=>r.id===S.sel))S.sel=null;relRender(k)}
+function relRender(k){const box=$('rel-'+k);if(!box)return;const S=REL[k];if(!S.loaded){box.innerHTML='<div class="note">Carregando…</div>';relLoad(k);return}
+  box.innerHTML=relPP(k)+`<div class="rel-grid"><div>${relList(k)}</div><div>${relDet(k)}</div></div>`}
+function relLast(k,id){const c=REL_CFG[k];return REL[k].cts.find(x=>x[c.fk]===id)}
+function relList(k){const c=REL_CFG[k],S=REL[k];const q=fold(S.q||'');
+  const rows=S.rows.filter(r=>(!S.fs||r.status===S.fs)&&(!q||fold(Object.values(r).filter(v=>typeof v==='string').join(' ')).includes(q)));
+  return `<div class="rel-list"><div class="hd"><input type="search" placeholder="Buscar ${c.plural}" value="${esc(S.q)}" oninput="REL.${k}.q=this.value;relListOnly('${k}')"><button class="btn" type="button" onclick="relNew('${k}')">+ ${c.Ent}</button></div>
+    <div class="fl">${[['','Todos'],...c.st].map(([v,l])=>`<button type="button" class="${S.fs===v?'on':''}" onclick="REL.${k}.fs='${v}';relRender('${k}')">${l} ${v?`<span style="opacity:.6">${S.rows.filter(r=>r.status===v).length}</span>`:''}</button>`).join('')}</div>
+    <div id="rel-${k}-items">${rows.map(r=>{const l=relLast(k,r.id);return `<div class="rel-it ${S.sel===r.id?'on':''}" onclick="relSel('${k}','${r.id}')"><div><b>${esc(r.nome)}</b><small>${esc(c.sub(r).filter(Boolean).join(' · ')||'—')}</small>${l?`<small>Último contato ${fDia(l.data_hora)} · ${canalNome(l.canal)}</small>`:''}</div><span class="st ${r.status}">${esc(relStNome(k,r.status))}</span></div>`}).join('')||`<div class="note" style="padding:14px">Nenhum ${c.ent} encontrado.</div>`}</div></div>`}
+function relListOnly(k){const el=$('rel-'+k);const v=document.activeElement;const pos=v&&v.selectionStart;relRender(k);const i=el.querySelector('input[type=search]');if(i){i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}}
+function relSel(k,id){const S=REL[k];S.sel=id;S.edit=false;relRender(k)}
+function relNew(k){const S=REL[k];S.sel='__new';S.edit=true;relRender(k)}
+function relPP(k){const c=REL_CFG[k],S=REL[k];const h=hojeISO();
+  const it=S.cts.filter(x=>x.proximo_passo&&!x.passo_concluido&&(k!=='crm'||x.status==='aberto')).sort((a,b)=>(a.data_proximo_passo||'9999').localeCompare(b.data_proximo_passo||'9999'));
+  const late=it.filter(x=>x.data_proximo_passo&&x.data_proximo_passo<h).length;
+  const nome=id=>(S.rows.find(r=>r.id===id)||{}).nome||'—';
+  return `<div class="pp"><h4><span>Próximos passos</span><span class="note" style="font-weight:400">${it.length} em aberto${late?` · <b class="c-bad">${late} atrasado${late>1?'s':''}</b>`:''}</span></h4>
+  ${it.map(x=>{const d=x.data_proximo_passo;const cls=d&&d<h?'late':d===h?'today':'';return `<div class="pp-it ${cls}"><span class="d">${d?(d<h?'Atrasado · ':d===h?'Hoje · ':'')+fDia(d):'Sem data'}</span><div style="cursor:pointer" onclick="relSel('${k}','${x[c.fk]}')">${esc(x.proximo_passo)}<div class="who">${esc(nome(x[c.fk]))}</div></div><button type="button" onclick="relDone('${k}','${x.id}',true)" title="Marcar como concluído">✓ Concluir</button></div>`}).join('')||'<div class="note" style="padding:12px 16px">Nada pendente.</div>'}</div>`}
+function relField(k,d,v){const [f,l,t]=d;const id=`rf_${k}_${f}`;
+  if(Array.isArray(t))return `<label>${l}<select id="${id}">${t.map(([a,b])=>`<option value="${a}" ${String(v??'')===a?'selected':''}>${b}</option>`).join('')}</select></label>`;
+  if(t==='ta')return `<label style="grid-column:1/-1">${l}<textarea id="${id}" rows="2">${esc(v||'')}</textarea></label>`;
+  const val=t==='pct'?(v==null?'':fmtIn(Number(v)*100)):(v??'');
+  return `<label>${l}<input id="${id}" value="${esc(String(val))}" ${t==='pct'?'inputmode="decimal"':''}></label>`}
+function relDet(k){const c=REL_CFG[k],S=REL[k];
+  if(!S.sel)return `<div class="rel-det"><div class="note" style="text-align:center;padding:60px 0">Selecione um ${c.ent} à esquerda ou crie um novo.</div></div>`+(k==='forn'?relCmp():'');
+  const r=S.sel==='__new'?{status:c.st[0][0]}:S.rows.find(x=>x.id===S.sel);if(!r)return '';
+  if(S.edit)return `<div class="rel-det"><h3>${S.sel==='__new'?'Novo '+c.ent:'Editar '+esc(r.nome)}</h3><div class="ef">${c.f.map(d=>relField(k,d,r[d[0]])).join('')}${relField(k,['status','Status',c.st],r.status)}</div>
+    <div style="display:flex;gap:8px"><button class="btn" type="button" onclick="relSave('${k}')">Salvar</button><button class="btn sec" type="button" onclick="REL.${k}.edit=false;if(REL.${k}.sel==='__new')REL.${k}.sel=null;relRender('${k}')">Cancelar</button></div></div>`;
+  const cts=S.cts.filter(x=>x[c.fk]===r.id);
+  const meta=c.f.filter(d=>!['nome','obs'].includes(d[0])&&r[d[0]]!=null&&r[d[0]]!=='').map(d=>`<span>${d[1]}: <b>${esc(d[2]==='pct'?pct0(Number(r[d[0]])):Array.isArray(d[2])?relOpt(k,d[0],r[d[0]]):r[d[0]])}</b></span>`).join('');
+  const tel=r.telefone?String(r.telefone).replace(/\D/g,''):'';
+  return `<div class="rel-det"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><h3>${esc(r.nome)} <span class="st ${r.status}" style="vertical-align:middle">${esc(relStNome(k,r.status))}</span></h3></div>
+    <div style="display:flex;gap:6px">${tel?`<a class="btn sec" href="https://wa.me/${tel}" target="_blank" rel="noopener">WhatsApp</a>`:''}<button class="btn sec" type="button" onclick="REL.${k}.edit=true;relRender('${k}')">Editar</button></div></div>
+    <div class="rel-meta">${meta||'<span>Sem dados de cadastro</span>'}</div>${r.obs?`<div class="note" style="margin:-4px 0 8px">${esc(r.obs)}</div>`:''}
+    ${relQF(k)}
+    <div class="tl">${cts.map(x=>relTl(k,x)).join('')||'<div class="note">Nenhum contato registrado ainda.</div>'}</div></div>`+(k==='forn'?relCmp():'')}
+function relQF(k){const c=REL_CFG[k],S=REL[k];const now=new Date();const loc=new Date(now-now.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+  return `<div class="qf"><div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:14px">Novo contato</b><div class="chs">${CANAIS.map(([v,l])=>`<button type="button" class="${S.canal===v?'on':''}" onclick="REL.${k}.canal='${v}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this))">${l}</button>`).join('')}</div></div>
+    <textarea id="qf_${k}_resumo" placeholder="O que foi conversado?"></textarea>
+    ${c.cx.length?`<div class="row">${c.cx.map(([f,l,t])=>Array.isArray(t)?`<select id="qf_${k}_${f}" title="${l}">${t.map(([a,b])=>`<option value="${a}">${l}: ${b}</option>`).join('')}</select>`:`<input id="qf_${k}_${f}" placeholder="${l}" ${t==='num'?'inputmode="decimal" style="max-width:150px"':'class="grow"'}>`).join('')}</div>`:''}
+    <div class="row"><input id="qf_${k}_pp" class="grow" placeholder="Próximo passo (opcional)"><input id="qf_${k}_dpp" type="date" title="Data do próximo passo"><input id="qf_${k}_dh" type="datetime-local" value="${loc}" title="Data e hora do contato"><button class="btn" type="button" onclick="relAddCt('${k}')">Registrar</button></div></div>`}
+function relTl(k,x){const c=REL_CFG[k];const ex=[];
+  if(k==='crm'){if(x.valor_proposta!=null)ex.push('Proposta '+brl(Number(x.valor_proposta)));ex.push('Negócio: '+({aberto:'aberto',fechado:'fechado',perdido:'perdido'}[x.status]||x.status))}
+  if(k==='forn'){if(x.item_cotado)ex.push(esc(x.item_cotado));if(x.preco_cotado!=null)ex.push(brl(Number(x.preco_cotado))+(x.unidade?'/'+esc(x.unidade):''));if(x.prazo_entrega)ex.push('prazo '+esc(x.prazo_entrega));if(x.pedido_minimo)ex.push('mín. '+esc(x.pedido_minimo))}
+  return `<div class="tl-it"><div class="h">${fDH(x.data_hora)} · ${canalNome(x.canal)}${ex.length?' · '+ex.join(' · '):''}</div>${x.resumo?`<div class="b">${esc(x.resumo)}</div>`:''}
+  ${x.proximo_passo?`<div class="np ${x.passo_concluido?'done':''}">→ ${esc(x.proximo_passo)}${x.data_proximo_passo?' · '+fDia(x.data_proximo_passo):''}</div>`:''}
+  <div class="acts">${x.proximo_passo?`<a onclick="relDone('${k}','${x.id}',${!x.passo_concluido})">${x.passo_concluido?'Reabrir passo':'Concluir passo'}</a>`:''}${k==='crm'&&x.status==='aberto'?`<a onclick="relCtSt('${x.id}','fechado')">Marcar fechado</a><a onclick="relCtSt('${x.id}','perdido')">Perdido</a>`:''}<a style="color:var(--mut)" onclick="relDelCt('${k}','${x.id}')">Excluir</a></div></div>`}
+async function relSave(k){const c=REL_CFG[k],S=REL[k];const o={};
+  for(const [f,,t] of [...c.f,['status','',c.st]]){const el=$(`rf_${k}_${f}`);if(!el)continue;let v=el.value.trim();if(t==='pct'){if(v===''){o[f]=null;continue}const n=num(v);if(n==null||Number.isNaN(n)){toast('Percentual inválido',1);return}o[f]=n/100;continue}o[f]=v===''?null:v}
+  if(!o.nome){toast('Informe o nome',1);return}if(o.uf)o.uf=o.uf.toUpperCase();o.updated_at=new Date().toISOString();
+  const q=S.sel==='__new'?sb.from(c.t).insert(o).select().single():sb.from(c.t).update(o).eq('id',S.sel).select().single();
+  const {data,error}=await q;if(error){toast('Erro ao salvar: '+error.message,1);return}
+  S.sel=data.id;S.edit=false;toast(c.Ent+' salvo');relLoad(k)}
+async function relAddCt(k){const c=REL_CFG[k],S=REL[k];const g=f=>{const el=$(`qf_${k}_${f}`);return el?el.value.trim():''};
+  const o={[c.fk]:S.sel,canal:S.canal,resumo:g('resumo')||null,proximo_passo:g('pp')||null,data_proximo_passo:g('dpp')||null};
+  const dh=g('dh');if(dh)o.data_hora=new Date(dh).toISOString();
+  for(const [f,,t] of c.cx){const v=g(f);if(t==='num'){if(v===''){o[f]=null;continue}const n=num(v);if(n==null||Number.isNaN(n)){toast('Valor inválido',1);return}o[f]=n}else o[f]=v===''?null:v}
+  if(!o.resumo&&!o.proximo_passo&&!(o.item_cotado)){toast('Escreva um resumo ou próximo passo',1);return}
+  const {error}=await sb.from(c.ct).insert(o);if(error){toast('Erro: '+error.message,1);return}
+  toast('Contato registrado');relLoad(k)}
+async function relDone(k,id,v){const {error}=await sb.from(REL_CFG[k].ct).update({passo_concluido:v,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}toast(v?'Passo concluído':'Passo reaberto');relLoad(k)}
+async function relCtSt(id,st){const {error}=await sb.from('contatos').update({status:st,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}relLoad('crm')}
+async function relDelCt(k,id){if(!confirm('Excluir este contato?'))return;const {error}=await sb.from(REL_CFG[k].ct).delete().eq('id',id);if(error){toast('Erro: '+error.message,1);return}relLoad(k)}
+function relCmp(){const S=REL.forn;const by={};
+  for(const x of S.cts){if(!x.item_cotado||x.preco_cotado==null)continue;const key=fold(x.item_cotado).trim()+'|'+fold(x.unidade||'');(by[key]=by[key]||{item:x.item_cotado,un:x.unidade,l:[]}).l.push(x)}
+  const grp=Object.values(by);
+  const nome=id=>(S.rows.find(r=>r.id===id)||{}).nome||'—';
+  return `<div class="rel-det" style="margin-top:16px;min-height:0"><b style="font-size:15px">Comparativo de cotações</b><div class="note">Último preço de cada fornecedor por item e unidade · menor preço em verde.</div>
+  ${grp.map(g=>{const last={};for(const x of g.l){if(!last[x.fornecedor_id]||x.data_hora>last[x.fornecedor_id].data_hora)last[x.fornecedor_id]=x}
+    const L=Object.values(last).sort((a,b)=>a.preco_cotado-b.preco_cotado);const min=L[0].preco_cotado;
+    return `<table class="cmpq"><tr><th colspan="5">${esc(g.item)}${g.un?' · por '+esc(g.un):''}</th></tr>${L.map(x=>`<tr class="${x.preco_cotado===min&&L.length>1?'best':''}"><td>${esc(nome(x.fornecedor_id))}</td><td class="n"><b>${brl(Number(x.preco_cotado))}</b></td><td>${x.preco_cotado===min?'':'+'+pct0(x.preco_cotado/min-1)}</td><td>${esc(x.prazo_entrega||'')}${x.pedido_minimo?' · mín. '+esc(x.pedido_minimo):''}</td><td class="n" style="color:var(--mut)">${fDia(x.data_hora)}</td></tr>`).join('')}</table>`}).join('')||'<div class="note" style="margin-top:8px">Registre contatos com item e preço cotado para comparar.</div>'}</div>`}
 </script>
 </body>
 </html>
