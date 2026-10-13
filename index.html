@@ -1808,13 +1808,13 @@ async function relDone(k,id,v){const {error}=await sb.from(REL_CFG[k].ct).update
 async function relCtSt(id,st){const {error}=await sb.from('contatos').update({status:st,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}relLoad('crm')}
 async function relDelCt(k,id){if(!confirm('Excluir este contato?'))return;const {error}=await sb.from(REL_CFG[k].ct).delete().eq('id',id);if(error){toast('Erro: '+error.message,1);return}relLoad(k)}
 function relCmp(){const S=REL.forn;const by={};
-  for(const x of S.cts){if(!x.item_cotado||x.preco_cotado==null)continue;const key=fold(x.item_cotado).trim()+'|'+fold(x.unidade||'');(by[key]=by[key]||{item:x.item_cotado,un:x.unidade,l:[]}).l.push(x)}
+  for(const x of S.cts){if(!x.item_cotado)continue;const key=fold(x.item_cotado).trim()+'|'+fold(x.unidade||'');(by[key]=by[key]||{item:x.item_cotado,un:x.unidade,l:[]}).l.push(x)}
   const grp=Object.values(by);
   const nome=id=>(S.rows.find(r=>r.id===id)||{}).nome||'—';
   return `<div class="rel-det" style="margin-top:16px;min-height:0"><b style="font-size:15px">Comparativo de cotações</b><div class="note">Último preço de cada fornecedor por item e unidade · menor preço em verde.</div>
   ${grp.map(g=>{const last={};for(const x of g.l){if(!last[x.fornecedor_id]||x.data_hora>last[x.fornecedor_id].data_hora)last[x.fornecedor_id]=x}
-    const L=Object.values(last).sort((a,b)=>a.preco_cotado-b.preco_cotado);const min=L[0].preco_cotado;
-    return `<table class="cmpq"><tr><th colspan="5">${esc(g.item)}${g.un?' · por '+esc(g.un):''}</th></tr>${L.map(x=>`<tr class="${x.preco_cotado===min&&L.length>1?'best':''}"><td>${esc(nome(x.fornecedor_id))}</td><td class="n"><b>${brl(Number(x.preco_cotado))}</b></td><td>${x.preco_cotado===min?'':'+'+pct0(x.preco_cotado/min-1)}</td><td>${esc(x.prazo_entrega||'')}${x.pedido_minimo?' · mín. '+esc(x.pedido_minimo):''}</td><td class="n" style="color:var(--mut)">${fDia(x.data_hora)}</td></tr>`).join('')}</table>`}).join('')||'<div class="note" style="margin-top:8px">Registre contatos com item e preço cotado para comparar.</div>'}</div>`}
+    const L=Object.values(last).sort((a,b)=>(a.preco_cotado??1e15)-(b.preco_cotado??1e15));const P=L.filter(x=>x.preco_cotado!=null);const min=P.length?P[0].preco_cotado:null;
+    return `<table class="cmpq"><tr><th colspan="5">${esc(g.item)}${g.un?' · por '+esc(g.un):''}</th></tr>${L.map(x=>`<tr class="${x.preco_cotado!=null&&x.preco_cotado===min&&P.length>1?'best':''}"><td>${esc(nome(x.fornecedor_id))}</td><td class="n">${x.preco_cotado==null?'<span class="note">preço pendente</span>':'<b>'+brl(Number(x.preco_cotado))+'</b>'}</td><td>${x.preco_cotado==null||x.preco_cotado===min?'':'+'+pct0(x.preco_cotado/min-1)}</td><td>${esc(x.prazo_entrega||'')}${x.pedido_minimo?' · mín. '+esc(x.pedido_minimo):''}</td><td class="n" style="color:var(--mut)">${fDia(x.data_hora)}</td></tr>`).join('')}</table>`}).join('')||'<div class="note" style="margin-top:8px">Registre contatos com item e preço cotado para comparar.</div>'}</div>`}
 </script>
 </body>
 </html>
