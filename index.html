@@ -1511,12 +1511,16 @@ function bfxRun(items,e,alvo,forceBon){
   const tier=forceBon!=null?{bon:forceBon}:null;
   const vNew=L.reduce((a,l)=>a+l.base*(1-dc)*l.nq,0);
   const bp=(tier?tier.bon:bfxTier(vNew).bon)/100;
-  for(const l of L){const pf=l.base*(1-dc);const c=calc(l.x.p,l.x.r,e,ord,pf);if(c.m==null){ok=false;continue}
-    rec+=pf*l.nq;m+=c.m*l.nq;un+=l.nq;
-    l.bq=Math.round(l.nq*bp);bun+=l.bq;
-    if(l.bq>0&&l.tab!=null){const ct=calc(l.x.p,l.x.r,e,ord,l.tab);if(ct.cmv==null){ok=false;continue}
-      const bv=l.tab*l.bq;bonV+=bv;bonC+=ct.cmv*l.bq+bv*(bonImp(ct)+(ct.frPct||0))}}
-  return {L,rec,m:m-bonC,bonV,bonC,ok,un,bun,bp,k:V0>0?rec/V0:1,V0}}
+  const C=[];
+  for(const l of L){const pf=l.base*(1-dc);l.pf=pf;const c=calc(l.x.p,l.x.r,e,ord,pf);if(c.m==null||c.cmv==null){ok=false;l.bq=0;continue}
+    rec+=pf*l.nq;m+=c.m*l.nq;un+=l.nq;l.bq=Math.floor(l.nq*bp);l.ucost=c.cmv+pf*(bonImp(c)+(c.frPct||0));C.push(l)}
+  const bonT=rec*bp;let cur=C.reduce((a,l)=>a+l.pf*l.bq,0);
+  for(let g=0;g<10000;g++){let best=null,bd=Math.abs(bonT-cur);
+    for(const l of C){for(const s of[1,-1]){if(s<0&&l.bq<=0)continue;const d=Math.abs(bonT-(cur+s*l.pf));if(d<bd-1e-9){bd=d;best=[l,s]}}}
+    if(!best)break;best[0].bq+=best[1];cur+=best[1]*best[0].pf}
+  for(const l of C){bun+=l.bq;bonV+=l.pf*l.bq;bonC+=l.ucost*l.bq}
+  const bonDiff=bonV-bonT;
+  return {L,rec,m:m-bonC,bonV,bonC,bonT,bonDiff,ok,un,bun,bp,k:V0>0?rec/V0:1,V0}}
 function bfHtml(items,e,hasEsp,A){
   const pc=x=>(x*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
   const ip=r=>r.rec?idx(r.m/r.rec):'—';
@@ -1534,11 +1538,11 @@ function bfHtml(items,e,hasEsp,A){
   const ed=`<div class="ed"><label>Valor-alvo do pedido R$<input inputmode="decimal" placeholder="${fmtIn(Math.round(r.V0*100)/100)}" value="${BFX.alvo?fmtIn(BFX.alvo):''}" onchange="bfxSet('alvo',this.value)"></label>
     <label>Tabela de preço<select style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:14px inherit;font-family:inherit;background:#fff" onchange="bfxSet('tab',this.value)">${tabOpt.map(([v,l])=>`<option value="${v}" ${String(BFX.tab)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
     <label>Desconto %<input inputmode="decimal" value="${fmtIn(BFX.dc)}" onchange="bfxSet('dc',this.value)" style="max-width:90px"></label></div>`;
-  const extra=`<span>Bonificação (régua)</span><b>${pc(r.bp)} · ${fmtIn(r.bun)} un. · ${brl(r.bonV)} tabela</b><span>Custo da bonificação</span><b>${brl(r.bonC)}</b>`;
+  const extra=`<span>Bonificação por faixa</span><b style="font-weight:500;text-align:right">${pc(r.bp)} de ${brl(r.rec)} = <b>${brl(r.bonT)}</b> em produtos (${fmtIn(r.bun)} un.)<br><span style="font-size:11px;color:var(--mut)">${Math.abs(r.bonDiff)<0.005?'sem diferença de arredondamento':'unidades inteiras somam '+brl(r.bonV)+' ('+(r.bonDiff>0?'+':'−')+brl(Math.abs(r.bonDiff))+' de arredondamento)'}</span></b><span>Custo real para você</span><b>${brl(r.bonC)} <span style="font-size:11px;color:var(--mut);font-weight:400">(CMV + frete${EMP==='lbr'?'':' + ICMS'})</span></b>`;
   const dm=r.m-A.m;const grow=A.rec?r.rec/A.rec-1:0;
   const mpr=r.rec?r.m/r.rec:0;const emp=mpr>0?A.m/mpr:null;
-  const ver=`<span class="tag ${dm>=-0.005?'ok':'no'}">${dm>=-0.005?'Faz sentido':'Não faz sentido'}</span>Pedido de <b>${brl(r.rec)}</b> (${grow>=0?'+':''}${pc(grow)} vs faturado) com <b>${pc(r.bp)} de bonificação</b>: margem ${brl(r.m)}, ${dm>=0?'+':'−'}${brl(Math.abs(dm))} vs a margem do faturado (${brl(A.m)}).${emp?` Para empatar nessa condição, o pedido precisa de <b>${brl(emp)}</b>${bfxTier(emp).bon/100!==r.bp?' (cai em outra faixa da régua)':''}.`:''}`;
-  /* régua editável + progressão */
+  const ver=`<span class="tag ${dm>=-0.005?'ok':'no'}">${dm>=-0.005?'Faz sentido':'Não faz sentido'}</span>Pedido de <b>${brl(r.rec)}</b> (${grow>=0?'+':''}${pc(grow)} vs faturado) com <b>${pc(r.bp)} de bonificação</b>: margem ${brl(r.m)}, ${dm>=0?'+':'−'}${brl(Math.abs(dm))} vs a margem do faturado (${brl(A.m)}).${emp?` Para empatar nessa condição, o pedido precisa de <b>${brl(emp)}</b>${bfxTier(emp).bon/100!==r.bp?' (cai em outra faixa de bonificação)':''}.`:''}`;
+  /* faixas de bonificação editável + progressão */
   const tiers=BFX.regua;let prev=0;
   const rows=tiers.map((t,i)=>{const lo=prev;const hi=t.ate;prev=hi||prev;
     const at=hi!=null?hi:Math.max(lo*1.5,r.V0);const x=bfxRun(items,e,at,t.bon);const d=x.m-A.m;const cur=bfxTier(r.rec)===t;
@@ -1556,7 +1560,7 @@ function bfHtml(items,e,hasEsp,A){
     ${r.L.map(l=>`<tr><td>${esc(nice(l.x.p.descricao))}</td><td class="n">${brl(l.base*(1-(Number(BFX.dc)||0)/100))}</td><td class="n">${fmtIn(l.x.q)}</td><td class="n"><b>${fmtIn(l.nq)}</b></td><td class="n">${fmtIn(l.bq)}</td></tr>`).join('')}
     <tr><td><b>Total</b></td><td></td><td class="n">${fmtIn(r.L.reduce((a,l)=>a+l.x.q,0))}</td><td class="n"><b>${fmtIn(r.un)}</b></td><td class="n">${fmtIn(r.bun)}</td></tr></tbody></table></div></details>`;
   return head+`<div class="bf2">${blk('Pedido faturado (XML)',A,'','')}${blk('Mesmo pedido na Black Friday',r,ed,extra)}</div><div class="bfv">${ver}</div>${itens}${tbl}
-    <div class="note" style="margin-top:8px;font-size:11px;color:var(--mut2)">O volume extra é distribuído na proporção dos itens da nota (unidades inteiras, ajuste no maior item); a bonificação da régua vale para esses mesmos itens e substitui a bonificação original da nota. Custo da bonificação: ${EMP==='lbr'?'CMV + frete':'CMV + ICMS + frete'} sobre o preço de tabela escolhido. Empate = pedido necessário para igualar a margem R$ do faturado.</div>`}
+    <div class="note" style="margin-top:8px;font-size:11px;color:var(--mut2)">O volume extra é distribuído na proporção dos itens da nota (unidades inteiras, ajuste no maior item); a bonificação por faixa vale para esses mesmos itens e substitui a bonificação original da nota. Custo da bonificação: ${EMP==='lbr'?'CMV + frete':'CMV + ICMS + frete'} sobre o preço de tabela escolhido. Empate = pedido necessário para igualar a margem R$ do faturado.</div>`}
 
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
 function simRun(items,e,s,hasEsp){
