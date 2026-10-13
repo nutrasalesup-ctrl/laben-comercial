@@ -1479,27 +1479,84 @@ function bfEval(items,e,hasEsp,A,v){
   const intu=(Number(v.bon)||0)+(Number(v.dc)||0);  /* % "intuitiva": cresce o mesmo % da concessão */
   const mIntu=r.m*(1+intu/100);
   return {r,k,need:k==null?null:k-1,emp:k==null?null:A.m/mpr,intu,mIntu,ok:k!=null&&mIntu>=A.m-0.005}}
+/* ===== Black Friday escalonada: valor-alvo → faixa de bonificação ===== */
+const BFX_KEY='laben-bfx-v1';
+let BFX={alvo:null,tab:'esp',dc:0,regua:[{ate:5000,bon:10},{ate:10000,bon:15},{ate:null,bon:20}]};
+try{const o=JSON.parse(localStorage.getItem(BFX_KEY)||'null');if(o&&Array.isArray(o.regua)&&o.regua.length)BFX=Object.assign(BFX,o)}catch(e){}
+function bfxSave(){localStorage.setItem(BFX_KEY,JSON.stringify(BFX))}
+function bfxSet(f,v){
+  if(f==='tab')BFX.tab=v==='esp'?'esp':Number(v);
+  else{const n=num(v);const ok=String(v).trim()!==''&&n!=null&&!Number.isNaN(n)&&n>=0;
+    if(f==='alvo')BFX.alvo=ok&&n>0?n:null;else BFX[f]=ok?Math.min(95,n):0}
+  bfxSave();renderSim()}
+function bfxReg(i,f,v){const n=num(v);const ok=String(v).trim()!==''&&n!=null&&!Number.isNaN(n)&&n>=0;const t=BFX.regua[i];if(!t)return;
+  if(f==='ate')t.ate=ok&&n>0?n:null;else t.bon=ok?Math.min(95,n):0;
+  BFX.regua.sort((a,b)=>(a.ate==null?1e15:a.ate)-(b.ate==null?1e15:b.ate));bfxSave();renderSim()}
+function bfxAddTier(){const r=BFX.regua;const last=r.filter(t=>t.ate!=null).pop();r.splice(r.length-1,0,{ate:last?Math.round(last.ate*1.5):5000,bon:last?last.bon:10});bfxSave();renderSim()}
+function bfxDelTier(i){if(BFX.regua.length<=1)return;BFX.regua.splice(i,1);if(!BFX.regua.some(t=>t.ate==null))BFX.regua[BFX.regua.length-1].ate=null;bfxSave();renderSim()}
+function bfxTier(v){for(const t of BFX.regua){if(t.ate==null||v<=t.ate+0.005)return t}return BFX.regua[BFX.regua.length-1]}
+/* monta o pedido escalado e calcula (mesma fórmula por dentro de calc) */
+function bfxRun(items,e,alvo,forceBon){
+  const sold=items.filter(x=>x.q>0);const tb=BFX.tab;const ord=tb==='esp'?NFAIXA:tb;
+  const priceOf=x=>tb==='esp'?x.pb:precoFaixa(x.r,tb,x.p);
+  const tabOf=x=>tb==='esp'?x.tab:precoFaixa(x.r,tb,x.p);
+  const dc=(Number(BFX.dc)||0)/100;
+  const L=sold.map(x=>({x,base:priceOf(x),tab:tabOf(x)})).filter(l=>l.base!=null);
+  const V0=L.reduce((a,l)=>a+l.base*(1-dc)*l.x.q,0);
+  const T=alvo>0?alvo:V0;const k=V0>0?T/V0:1;
+  for(const l of L)l.nq=Math.max(0,Math.round(l.x.q*k));
+  if(L.length){const big=L.reduce((a,b)=>a.base*a.x.q>=b.base*b.x.q?a:b);const pu=big.base*(1-dc);
+    const cur=L.reduce((a,l)=>a+l.base*(1-dc)*l.nq,0);if(pu>0)big.nq=Math.max(0,big.nq+Math.round((T-cur)/pu))}
+  let rec=0,m=0,bonV=0,bonC=0,ok=true,un=0,bun=0;
+  const tier=forceBon!=null?{bon:forceBon}:null;
+  const vNew=L.reduce((a,l)=>a+l.base*(1-dc)*l.nq,0);
+  const bp=(tier?tier.bon:bfxTier(vNew).bon)/100;
+  for(const l of L){const pf=l.base*(1-dc);const c=calc(l.x.p,l.x.r,e,ord,pf);if(c.m==null){ok=false;continue}
+    rec+=pf*l.nq;m+=c.m*l.nq;un+=l.nq;
+    l.bq=Math.round(l.nq*bp);bun+=l.bq;
+    if(l.bq>0&&l.tab!=null){const ct=calc(l.x.p,l.x.r,e,ord,l.tab);if(ct.cmv==null){ok=false;continue}
+      const bv=l.tab*l.bq;bonV+=bv;bonC+=ct.cmv*l.bq+bv*(bonImp(ct)+(ct.frPct||0))}}
+  return {L,rec,m:m-bonC,bonV,bonC,ok,un,bun,bp,k:V0>0?rec/V0:1,V0}}
 function bfHtml(items,e,hasEsp,A){
+  const pc=x=>(x*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+  const ip=r=>r.rec?idx(r.m/r.rec):'—';
+  const fxl=faixasUf(NUF);const fxName=o=>{const f=fxl.find(x=>x.ordem===o);return f&&f.pedido_de!=null?'Tabela ≥ R$ '+Number(f.pedido_de).toLocaleString('pt-BR'):'Tabela faixa '+o};
+  const empSel=`<div class="seg sm" style="display:inline-flex">${[['nutrissima','Nutríssima'],['lbr','LBR']].map(([v,l])=>`<button type="button" class="${v===EMP?'on':''}" onclick="setEmp('${v}')">${l}</button>`).join('')}</div>`;
+  const strip=`<div class="ufstrip" style="margin:0 0 12px">${ufStripHtml(e,items)}</div>`;
   const semS=EMP==='lbr'&&lbrAliq()==null;
-  if(semS)return `<div class="bfv"><span class="tag no">Falta dado</span>LBR (Simples): informe a alíquota do Simples em Estados › Empresa para comparar margens.</div>`;
-  const ev=BF.map(v=>bfEval(items,e,hasEsp,A,v));const m=ev[0],v0=BF[0];
-  const ip=r=>r.rec?idx(r.m/r.rec):'—';const pc=x=>(x*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
-  const blk=(t,r,ed)=>`<div class="bfb"><h3>${t}</h3>${ed||''}<div class="kv">
-    <span>Valor do pedido</span><b>${brl(r.rec)}</b><span>Custo total</span><b>${brl(r.rec-r.m)}</b>
-    <span>Margem R$</span><b class="big ${r.m<0?'c-bad':''}">${brl(r.m)}</b><span>Índice</span><b><span class="pill ${r.rec&&r.m/r.rec<0.1?'warn':'ok'}">${ip(r)}</span></b></div></div>`;
-  const ed=`<div class="ed"><label>Desconto %<input inputmode="decimal" value="${fmtIn(v0.dc)}" onchange="bfSet(0,'dc',this.value)"></label><label>Bonificação %<input inputmode="decimal" value="${fmtIn(v0.bon)}" onchange="bfSet(0,'bon',this.value)"></label></div>`;
-  const ver=m.need==null?`<span class="tag no">Não faz sentido</span>Com ${bfLabel(v0)}, a margem do pedido fica zerada ou negativa.`
-    :m.need<=0.0005?`<span class="tag ok">Faz sentido</span>Com ${bfLabel(v0)}, a margem em R$ não cai.`
-    :`<span class="tag ${m.ok?'ok':'no'}">${m.ok?'Faz sentido':'Não faz sentido'}</span>Com ${bfLabel(v0)}, o pedido precisa ser <b>${pc(m.need)} maior (${brl(m.emp)})</b> para manter a mesma margem em R$ do pedido faturado (${brl(A.m)}). ${m.intu?`Se o cliente crescer só ${m.intu.toLocaleString('pt-BR')}%, a margem fica em ${brl(m.mIntu)}.`:''}`;
-  let tbl='';
-  if(BF.length>1){const bi=ev.reduce((b,x,i)=>x.r.m>ev[b].r.m?i:b,0);
-    tbl=`<div class="bft"><table><thead><tr><th>Cenário</th><th class="n">Desc. %</th><th class="n">Bonif. %</th><th class="n">Margem R$</th><th class="n">Crescimento necessário</th><th>Veredito</th></tr></thead><tbody>
-    ${ev.map((x,i)=>`<tr class="${i===bi?'best':''}"><td><a href="#" onclick="bfTop(${i});return false" title="Abrir no bloco">${esc(bfLabel(BF[i]))}</a>${i===bi?' <span class="tag" style="font-size:11px;color:#fff;background:var(--acc);border-radius:999px;padding:1px 8px">melhor</span>':''}</td>
-      <td class="n"><input inputmode="decimal" value="${fmtIn(BF[i].dc)}" onchange="bfSet(${i},'dc',this.value)"></td><td class="n"><input inputmode="decimal" value="${fmtIn(BF[i].bon)}" onchange="bfSet(${i},'bon',this.value)"></td>
-      <td class="n">${brl(x.r.m)}</td><td class="n">${x.need==null?'—':(x.need<=0.0005?'0%':'+'+pc(x.need))}${x.intu?` <span class="muted">vs ${x.intu.toLocaleString('pt-BR')}% intuitivo</span>`:''}</td>
-      <td><span class="${x.ok?'c-ok':'c-bad'}" style="font-weight:600">${x.ok?'Faz sentido':'Não faz sentido'}</span></td></tr>`).join('')}</tbody></table></div>`}
-  return `<div class="bf2">${blk('Pedido faturado (XML)',A,'')}${blk('Mesmo pedido na Black Friday',m.r,ed)}</div><div class="bfv">${ver}</div>${tbl}
-    <div class="note" style="margin-top:8px;font-size:11px;color:var(--mut2)">Bonificação custa ${EMP==='lbr'?'CMV + frete':'CMV + ICMS + frete'} sobre o preço de tabela, não o preço cheio. "Faz sentido" = crescendo a mesma % da concessão, a margem R$ alcança a do faturado.</div>`}
+  const head=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px"><span class="note" style="font-size:12px;color:var(--mut)">Empresa</span>${empSel}</div>${strip}`;
+  if(semS)return head+`<div class="bfv"><span class="tag no">Falta dado</span>LBR (Simples): informe a alíquota do Simples em Estados › Empresa.</div>`;
+  const r=bfxRun(items,e,BFX.alvo,null);
+  const blk=(t,x,ed,extra)=>`<div class="bfb"><h3>${t}</h3>${ed||''}<div class="kv">
+    <span>Valor do pedido</span><b>${brl(x.rec)}</b>${extra||''}<span>Custo total</span><b>${brl(x.rec-x.m)}</b>
+    <span>Margem R$</span><b class="big ${x.m<0?'c-bad':''}">${brl(x.m)}</b><span>Índice</span><b><span class="pill ${x.rec&&x.m/x.rec<0.1?'warn':'ok'}">${ip(x)}</span></b></div></div>`;
+  const tabOpt=[['esp','Preço faturado (XML)'],...fxl.map(f=>[f.ordem,fxName(f.ordem)])];
+  const ed=`<div class="ed"><label>Valor-alvo do pedido R$<input inputmode="decimal" placeholder="${fmtIn(Math.round(r.V0*100)/100)}" value="${BFX.alvo?fmtIn(BFX.alvo):''}" onchange="bfxSet('alvo',this.value)"></label>
+    <label>Tabela de preço<select style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:14px inherit;font-family:inherit;background:#fff" onchange="bfxSet('tab',this.value)">${tabOpt.map(([v,l])=>`<option value="${v}" ${String(BFX.tab)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+    <label>Desconto %<input inputmode="decimal" value="${fmtIn(BFX.dc)}" onchange="bfxSet('dc',this.value)" style="max-width:90px"></label></div>`;
+  const extra=`<span>Bonificação (régua)</span><b>${pc(r.bp)} · ${fmtIn(r.bun)} un. · ${brl(r.bonV)} tabela</b><span>Custo da bonificação</span><b>${brl(r.bonC)}</b>`;
+  const dm=r.m-A.m;const grow=A.rec?r.rec/A.rec-1:0;
+  const mpr=r.rec?r.m/r.rec:0;const emp=mpr>0?A.m/mpr:null;
+  const ver=`<span class="tag ${dm>=-0.005?'ok':'no'}">${dm>=-0.005?'Faz sentido':'Não faz sentido'}</span>Pedido de <b>${brl(r.rec)}</b> (${grow>=0?'+':''}${pc(grow)} vs faturado) com <b>${pc(r.bp)} de bonificação</b>: margem ${brl(r.m)}, ${dm>=0?'+':'−'}${brl(Math.abs(dm))} vs a margem do faturado (${brl(A.m)}).${emp?` Para empatar nessa condição, o pedido precisa de <b>${brl(emp)}</b>${bfxTier(emp).bon/100!==r.bp?' (cai em outra faixa da régua)':''}.`:''}`;
+  /* régua editável + progressão */
+  const tiers=BFX.regua;let prev=0;
+  const rows=tiers.map((t,i)=>{const lo=prev;const hi=t.ate;prev=hi||prev;
+    const at=hi!=null?hi:Math.max(lo*1.5,r.V0);const x=bfxRun(items,e,at,t.bon);const d=x.m-A.m;const cur=bfxTier(r.rec)===t;
+    const mprT=x.rec?x.m/x.rec:0;const be=mprT>0?A.m/mprT:null;
+    return `<tr class="${cur?'best':''}"><td>${hi==null?(lo?'acima de '+brl(lo):'qualquer valor'):(i===0||!lo?'até':'de '+brl(lo)+' até')} ${hi!=null?`<input inputmode="decimal" value="${fmtIn(hi)}" onchange="bfxReg(${i},'ate',this.value)" style="width:90px">`:''}</td>
+      <td class="n"><input inputmode="decimal" value="${fmtIn(t.bon)}" onchange="bfxReg(${i},'bon',this.value)">%</td>
+      <td class="n">${brl(x.rec)}${hi==null?' <span class="muted">(ex.)</span>':''}</td><td class="n">${brl(x.m)}</td><td class="n">${ip(x)}</td>
+      <td class="n">${be?brl(be):'—'}</td>
+      <td><span class="${d>=-0.005?'c-ok':'c-bad'}" style="font-weight:600">${d>=-0.005?'Faz sentido':'Não faz sentido'}</span></td>
+      <td>${tiers.length>1?`<button class="rm" title="Remover faixa" onclick="bfxDelTier(${i})">×</button>`:''}</td></tr>`}).join('');
+  const tbl=`<div class="bft"><table><thead><tr><th>Faixa do pedido</th><th class="n">Bonificação</th><th class="n">Pedido (no limite)</th><th class="n">Margem R$</th><th class="n">Índice</th><th class="n">Empate</th><th>Veredito</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <div style="margin-top:6px"><button class="btn sec tiny" type="button" onclick="bfxAddTier()">+ faixa</button></div></div>`;
+  const itens=`<details style="margin-top:12px"><summary class="note" style="cursor:pointer;font-size:13px;color:var(--acc)">Ver itens (${r.L.length})</summary>
+    <div class="bft"><table><thead><tr><th>Produto</th><th class="n">Preço</th><th class="n">Qtd original</th><th class="n">Qtd nova</th><th class="n">Bonificada</th></tr></thead><tbody>
+    ${r.L.map(l=>`<tr><td>${esc(nice(l.x.p.descricao))}</td><td class="n">${brl(l.base*(1-(Number(BFX.dc)||0)/100))}</td><td class="n">${fmtIn(l.x.q)}</td><td class="n"><b>${fmtIn(l.nq)}</b></td><td class="n">${fmtIn(l.bq)}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td></td><td class="n">${fmtIn(r.L.reduce((a,l)=>a+l.x.q,0))}</td><td class="n"><b>${fmtIn(r.un)}</b></td><td class="n">${fmtIn(r.bun)}</td></tr></tbody></table></div></details>`;
+  return head+`<div class="bf2">${blk('Pedido faturado (XML)',A,'','')}${blk('Mesmo pedido na Black Friday',r,ed,extra)}</div><div class="bfv">${ver}</div>${itens}${tbl}
+    <div class="note" style="margin-top:8px;font-size:11px;color:var(--mut2)">O volume extra é distribuído na proporção dos itens da nota (unidades inteiras, ajuste no maior item); a bonificação da régua vale para esses mesmos itens e substitui a bonificação original da nota. Custo da bonificação: ${EMP==='lbr'?'CMV + frete':'CMV + ICMS + frete'} sobre o preço de tabela escolhido. Empate = pedido necessário para igualar a margem R$ do faturado.</div>`}
 
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
 function simRun(items,e,s,hasEsp){
