@@ -291,6 +291,8 @@ tr.row.off .pn{font-weight:400}
 
 
 /* ---- CRM / Fornecedores / Representantes ---- */
+#tabs{overflow-x:auto;scrollbar-width:none;max-width:62vw}#tabs::-webkit-scrollbar{display:none}#tabs button{white-space:nowrap;padding-left:10px;padding-right:10px}
+.rel-list .hd input{min-width:0}
 .rel-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
 @media(max-width:900px){.rel-grid{grid-template-columns:1fr}}
 .rel-list{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
@@ -331,6 +333,7 @@ tr.row.off .pn{font-weight:400}
 .ef label{font-size:12px;color:var(--mut);display:grid;gap:3px}
 .ef input,.ef select,.ef textarea{border:1px solid var(--line);border-radius:10px;padding:7px 9px;font:inherit;font-size:14px;color:#1d1d1f}
 .lt{font-size:10.5px;border-radius:6px;padding:1px 6px;margin-left:2px;vertical-align:middle;font-weight:500;background:#efe7df;color:#8d5a33}.lt.nutrissima{background:#e6f4ea;color:#1b7f3b}.lt.gsfoods{background:#e8f1fc;color:#0058b0}
+.lt.ai-custo{background:#fff4e0;color:#a35a00}.lt.ai-desenvolvimento{background:#efe9fb;color:#6b3fb8}.lt.ai-obra{background:#eee;color:#555}.lt.ai-outro{background:#f0f0f2;color:#666}
 .cmpq{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.cmpq th,.cmpq td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
 .cmpq td.n{text-align:right;font-variant-numeric:tabular-nums}.cmpq tr.best td{background:#eef8f0}
 </style>
@@ -348,6 +351,7 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="crm">CRM</button>
       <button data-tab="forn">Fornecedores</button>
       <button data-tab="rep">Representantes</button>
+      <button data-tab="ai">Assuntos internos</button>
     </nav>
     <div class="hright">
       <div class="seg sm" id="empSeg" title="Empresa emissora"></div>
@@ -529,6 +533,11 @@ tr.row.off .pn{font-weight:400}
     <p class="psub">Representantes comerciais por região, contatos e próximos passos.</p>
     <div id="rel-rep"></div>
   </section>
+  <section id="tab-ai" class="hide">
+    <h2 class="ptitle">Assuntos internos</h2>
+    <p class="psub">Custos, desenvolvimento, obras e decisões internas, com próximos passos.</p>
+    <div id="rel-ai"></div>
+  </section>
   <section id="tab-estados" class="hide">
     <h2 class="ptitle">Estados</h2>
     <p class="psub">ICMS, PIS/COFINS, frete e condições comerciais por UF (origem SP).</p>
@@ -638,9 +647,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();
 });
 
 async function fetchAll(table,orderBy){
@@ -1818,6 +1827,51 @@ function relCmp(){const S=REL.forn;const by={};
   ${grp.map(g=>{const last={};for(const x of g.l){if(!last[x.fornecedor_id]||x.data_hora>last[x.fornecedor_id].data_hora)last[x.fornecedor_id]=x}
     const L=Object.values(last).sort((a,b)=>(a.preco_cotado??1e15)-(b.preco_cotado??1e15));const P=L.filter(x=>x.preco_cotado!=null);const min=P.length?P[0].preco_cotado:null;
     return `<table class="cmpq"><tr><th colspan="5">${esc(g.item)}${g.un?' · por '+esc(g.un):''}</th></tr>${L.map(x=>`<tr class="${x.preco_cotado!=null&&x.preco_cotado===min&&P.length>1?'best':''}"><td>${esc(nome(x.fornecedor_id))}</td><td class="n">${x.preco_cotado==null?'<span class="note">preço pendente</span>':'<b>'+brl(Number(x.preco_cotado))+'</b>'}</td><td>${x.preco_cotado==null||x.preco_cotado===min?'':'+'+pct0(x.preco_cotado/min-1)}</td><td>${esc(x.prazo_entrega||'')}${x.pedido_minimo?' · mín. '+esc(x.pedido_minimo):''}</td><td class="n" style="color:var(--mut)">${fDia(x.data_hora)}</td></tr>`).join('')}</table>`}).join('')||'<div class="note" style="margin-top:8px">Registre contatos com item e preço cotado para comparar.</div>'}</div>`}
+/* ---------- Assuntos internos ---------- */
+const AI_CAT=[['custo','Custo'],['desenvolvimento','Desenvolvimento'],['obra','Obra'],['outro','Outro']];
+const AI={rows:[],sel:null,q:'',fc:'',edit:false,loaded:false};
+const aiCat=a=>(a||[]).map(v=>`<span class="lt ai-${v}">${(AI_CAT.find(x=>x[0]===v)||[,v])[1]}</span>`).join('');
+async function aiLoad(){const {data,error}=await sb.from('assuntos_internos').select('*').order('data_hora',{ascending:false});
+  if(error){toast('Erro ao carregar assuntos: '+error.message,1);return}AI.rows=data||[];AI.loaded=true;if(AI.sel&&AI.sel!=='__new'&&!AI.rows.some(r=>r.id===AI.sel))AI.sel=null;aiRender()}
+function aiRender(){const box=$('rel-ai');if(!box)return;if(!AI.loaded){box.innerHTML='<div class="note">Carregando…</div>';aiLoad();return}
+  box.innerHTML=aiPP()+`<div class="rel-grid"><div>${aiList()}</div><div>${aiDet()}</div></div>`}
+function aiPP(){const h=hojeISO();const it=AI.rows.filter(x=>x.proximo_passo&&!x.passo_concluido).sort((a,b)=>(a.data_proximo_passo||'9999').localeCompare(b.data_proximo_passo||'9999'));
+  const late=it.filter(x=>x.data_proximo_passo&&x.data_proximo_passo<h).length;
+  return `<div class="pp"><h4><span>Próximos passos</span><span class="note" style="font-weight:400">${it.length} em aberto${late?` · <b class="c-bad">${late} atrasado${late>1?'s':''}</b>`:''}</span></h4>
+  ${it.map(x=>{const d=x.data_proximo_passo;const cls=d&&d<h?'late':d===h?'today':'';return `<div class="pp-it ${cls}"><span class="d">${d?(d<h?'Atrasado · ':d===h?'Hoje · ':'')+fDia(d):'Sem data'}</span><div style="cursor:pointer" onclick="aiSel('${x.id}')">${esc(x.proximo_passo)}<div class="who">${esc(x.titulo)}${x.responsavel?' · '+esc(x.responsavel):''}</div></div><button type="button" onclick="aiDone('${x.id}',true)">✓ Concluir</button></div>`}).join('')||'<div class="note" style="padding:12px 16px">Nada pendente.</div>'}</div>`}
+function aiList(){const q=fold(AI.q||'');
+  const rows=AI.rows.filter(r=>(!AI.fc||(r.categoria||[]).includes(AI.fc))&&(!q||fold([r.titulo,r.descricao,r.responsavel,r.proximo_passo,JSON.stringify(r.valores||'')].join(' ')).includes(q)));
+  return `<div class="rel-list"><div class="hd"><input type="search" placeholder="Buscar assuntos" value="${esc(AI.q)}" oninput="AI.q=this.value;aiListOnly()"><button class="btn" type="button" onclick="AI.sel='__new';AI.edit=true;aiRender()">+ Novo</button></div>
+  <div class="fl">${[['','Todos'],...AI_CAT].map(([v,l])=>`<button type="button" class="${AI.fc===v?'on':''}" onclick="AI.fc='${v}';aiRender()">${l}</button>`).join('')}</div>
+  <div>${rows.map(r=>`<div class="rel-it ${AI.sel===r.id?'on':''}" onclick="aiSel('${r.id}')"><div><b>${esc(r.titulo)}</b><small>${fDH(r.data_hora)}${r.responsavel?' · '+esc(r.responsavel):''}</small><small>${aiCat(r.categoria)}</small></div>${r.proximo_passo&&!r.passo_concluido?'<span class="st prospect">passo aberto</span>':''}</div>`).join('')||'<div class="note" style="padding:14px">Nenhum registro.</div>'}</div></div>`}
+function aiListOnly(){const p=document.activeElement&&document.activeElement.selectionStart;aiRender();const i=$('rel-ai').querySelector('input[type=search]');if(i){i.focus();try{i.setSelectionRange(p,p)}catch(e){}}}
+function aiSel(id){AI.sel=id;AI.edit=false;aiRender()}
+function aiVals(v){if(!Array.isArray(v)||!v.length)return '';const b=Number(v[0].valor);
+  return `<table class="cmpq" style="margin:8px 0 14px"><tr><th>Item</th><th style="text-align:right">Valor</th><th style="text-align:right">vs ${esc(v[0].item)}</th></tr>${v.map((x,i)=>{const n=Number(x.valor);const d=i&&b?n/b-1:null;return `<tr class="${i&&n===Math.min(...v.map(y=>Number(y.valor)))?'best':''}"><td>${esc(x.item)}</td><td class="n"><b>${isFinite(n)?brl(n):esc(String(x.valor))}</b>${x.unidade?` <span class="note">${esc(x.unidade.replace(/^R\$\s*/,''))}</span>`:''}</td><td class="n">${d==null?'—':(d>0?'+':'−')+pct0(Math.abs(d))+' ('+(n-b>0?'+':'−')+brl(Math.abs(n-b))+')'}</td></tr>`}).join('')}</table>`}
+function aiDet(){if(!AI.sel)return `<div class="rel-det"><div class="note" style="text-align:center;padding:60px 0">Selecione um registro à esquerda ou crie um novo.</div></div>`;
+  const r=AI.sel==='__new'?{categoria:['outro'],data_hora:new Date().toISOString()}:AI.rows.find(x=>x.id===AI.sel);if(!r)return '';
+  if(AI.edit){const loc=new Date(new Date(r.data_hora)-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
+    const vt=(r.valores||[]).map(x=>[x.item,x.valor!=null?fmtIn(x.valor):'',x.unidade||''].join(' ; ')).join('\n');
+    return `<div class="rel-det"><h3>${AI.sel==='__new'?'Novo registro':'Editar registro'}</h3><div class="ef">
+      <label style="grid-column:1/-1">Título<input id="ai_titulo" value="${esc(r.titulo||'')}"></label>
+      <label style="grid-column:1/-1">Categoria<span style="display:flex;gap:14px;color:#1d1d1f;font-size:14px">${AI_CAT.map(([a,b])=>`<span><input type="checkbox" name="ai_cat" value="${a}" ${(r.categoria||[]).includes(a)?'checked':''}> ${b}</span>`).join('')}</span></label>
+      <label>Data e hora<input id="ai_dh" type="datetime-local" value="${loc}"></label><label>Responsável<input id="ai_resp" value="${esc(r.responsavel||'')}"></label>
+      <label style="grid-column:1/-1">Descrição<textarea id="ai_desc" rows="3">${esc(r.descricao||'')}</textarea></label>
+      <label style="grid-column:1/-1">Valores (opcional · uma linha por item: item ; valor ; unidade)<textarea id="ai_vals" rows="3" placeholder="Fórmula atual · pote 1 kg ; 16,09 ; R$/kg">${esc(vt)}</textarea></label>
+      <label>Próximo passo<input id="ai_pp" value="${esc(r.proximo_passo||'')}"></label><label>Data do próximo passo<input id="ai_dpp" type="date" value="${r.data_proximo_passo||''}"></label></div>
+      <div style="display:flex;gap:8px"><button class="btn" type="button" onclick="aiSave()">Salvar</button><button class="btn sec" type="button" onclick="AI.edit=false;if(AI.sel==='__new')AI.sel=null;aiRender()">Cancelar</button></div></div>`}
+  return `<div class="rel-det"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><h3>${esc(r.titulo)}</h3><div style="display:flex;gap:6px"><button class="btn sec" type="button" onclick="AI.edit=true;aiRender()">Editar</button><button class="btn sec" type="button" onclick="aiDel('${r.id}')">Excluir</button></div></div>
+    <div class="rel-meta"><span>${fDH(r.data_hora)}</span>${r.responsavel?`<span>Responsável: <b>${esc(r.responsavel)}</b></span>`:''}<span>${aiCat(r.categoria)}</span></div>
+    ${r.descricao?`<div style="font-size:14px;white-space:pre-wrap">${esc(r.descricao)}</div>`:''}${aiVals(r.valores)}
+    ${r.proximo_passo?`<div class="qf" style="grid-template-columns:1fr auto;align-items:center"><div><span class="note">Próximo passo${r.data_proximo_passo?' · '+fDia(r.data_proximo_passo):''}</span><div class="np ${r.passo_concluido?'done':''}" style="font-size:14px;${r.passo_concluido?'text-decoration:line-through;color:var(--mut)':''}">→ ${esc(r.proximo_passo)}</div></div><button class="btn sec" type="button" onclick="aiDone('${r.id}',${!r.passo_concluido})">${r.passo_concluido?'Reabrir':'✓ Concluir'}</button></div>`:''}</div>`}
+async function aiSave(){const g=id=>$(id).value.trim();const o={titulo:g('ai_titulo'),categoria:[...document.querySelectorAll('input[name=ai_cat]:checked')].map(x=>x.value),responsavel:g('ai_resp')||null,descricao:g('ai_desc')||null,proximo_passo:g('ai_pp')||null,data_proximo_passo:g('ai_dpp')||null,updated_at:new Date().toISOString()};
+  if(!o.titulo){toast('Informe o título',1);return}if(!o.categoria.length)o.categoria=['outro'];const dh=g('ai_dh');if(dh)o.data_hora=new Date(dh).toISOString();
+  const vl=g('ai_vals').split('\n').map(l=>l.split(';').map(x=>x.trim())).filter(p=>p[0]);
+  o.valores=vl.length?vl.map(([item,v,u])=>{const n=num(v);return {item,valor:n!=null&&!Number.isNaN(n)?n:(v||null),unidade:u||null}}):null;
+  const q=AI.sel==='__new'?sb.from('assuntos_internos').insert(o).select().single():sb.from('assuntos_internos').update(o).eq('id',AI.sel).select().single();
+  const {data,error}=await q;if(error){toast('Erro ao salvar: '+error.message,1);return}AI.sel=data.id;AI.edit=false;toast('Registro salvo');aiLoad()}
+async function aiDone(id,v){const {error}=await sb.from('assuntos_internos').update({passo_concluido:v,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}toast(v?'Passo concluído':'Passo reaberto');aiLoad()}
+async function aiDel(id){if(!confirm('Excluir este registro?'))return;const {error}=await sb.from('assuntos_internos').delete().eq('id',id);if(error){toast('Erro: '+error.message,1);return}AI.sel=null;aiLoad()}
 </script>
 </body>
 </html>
