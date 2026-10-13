@@ -330,6 +330,7 @@ tr.row.off .pn{font-weight:400}
 .ef{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:8px 0}
 .ef label{font-size:12px;color:var(--mut);display:grid;gap:3px}
 .ef input,.ef select,.ef textarea{border:1px solid var(--line);border-radius:10px;padding:7px 9px;font:inherit;font-size:14px;color:#1d1d1f}
+.lt{font-size:10.5px;border-radius:6px;padding:1px 6px;margin-left:2px;vertical-align:middle;font-weight:500;background:#efe7df;color:#8d5a33}.lt.nutrissima{background:#e6f4ea;color:#1b7f3b}.lt.gsfoods{background:#e8f1fc;color:#0058b0}
 .cmpq{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.cmpq th,.cmpq td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
 .cmpq td.n{text-align:right;font-variant-numeric:tabular-nums}.cmpq tr.best td{background:#eef8f0}
 </style>
@@ -1721,8 +1722,8 @@ const CANAIS=[['whatsapp','WhatsApp'],['ligacao','Ligação'],['visita','Visita'
 const canalNome=v=>(CANAIS.find(c=>c[0]===v)||[,v||'—'])[1];
 const REL_CFG={
   crm:{t:'clientes',ct:'contatos',fk:'cliente_id',ent:'cliente',Ent:'Cliente',plural:'clientes',
-    st:[['prospect','Prospect'],['ativo','Ativo'],['inativo','Inativo']],
-    f:[['nome','Nome'],['contato','Contato'],['telefone','Telefone'],['cnpj','CNPJ'],['cidade','Cidade'],['uf','UF'],['empresa_faturamento','Empresa',[['','—'],['nutrissima','Nutríssima'],['lbr','LBR']]],['fornecedor_atual','Fornecedor atual / concorrente'],['obs','Observações','ta']],
+    st:[['prospect','Prospect'],['negociacao','Em negociação'],['ativo','Ativo'],['inativo','Inativo']],
+    f:[['nome','Nome'],['linhas','Linha / representada','tags'],['contato','Contato'],['telefone','Telefone'],['cnpj','CNPJ'],['cidade','Cidade'],['uf','UF'],['empresa_faturamento','Empresa',[['','—'],['nutrissima','Nutríssima'],['lbr','LBR']]],['fornecedor_atual','Fornecedor atual / concorrente'],['obs','Observações','ta']],
     sub:x=>[x.contato,[x.cidade,x.uf].filter(Boolean).join('/'),x.empresa_faturamento?(x.empresa_faturamento==='lbr'?'LBR':'Nutríssima'):''],
     cx:[['valor_proposta','Valor da proposta R$','num'],['status','Negócio',[['aberto','Aberto'],['fechado','Fechado'],['perdido','Perdido']]]]},
   forn:{t:'fornecedores',ct:'contatos_fornecedor',fk:'fornecedor_id',ent:'fornecedor',Ent:'Fornecedor',plural:'fornecedores',
@@ -1735,6 +1736,7 @@ const REL_CFG={
     f:[['nome','Nome'],['empresa','Empresa'],['telefone','Telefone'],['email','E-mail'],['cidade','Cidade'],['ufs_atendidas','UFs atendidas'],['regiao','Região'],['comissao_pct','Comissão %','pct'],['obs','Observações','ta']],
     sub:x=>[x.empresa,x.cidade,x.ufs_atendidas?'UFs '+x.ufs_atendidas:'',x.comissao_pct!=null?'comissão '+pct0(Number(x.comissao_pct)):''],cx:[]}
 };
+const LINHAS=[['laben','Laben'],['nutrissima','Nutríssima'],['gsfoods','GS Foods']];const linTags=a=>(a||[]).map(v=>`<span class="lt ${v}">${(LINHAS.find(x=>x[0]===v)||[,v])[1]}</span>`).join('');
 const REL={};for(const k in REL_CFG)REL[k]={rows:[],cts:[],sel:null,q:'',fs:'',edit:false,canal:'whatsapp',loaded:false};
 function relOpt(k,f,v){const d=REL_CFG[k].f.find(x=>x[0]===f);const o=d&&Array.isArray(d[2])?d[2].find(x=>x[0]===v):null;return o?o[1]:(v||'')}
 const relStNome=(k,v)=>(REL_CFG[k].st.find(s=>s[0]===v)||[,v])[1];
@@ -1749,10 +1751,10 @@ function relRender(k){const box=$('rel-'+k);if(!box)return;const S=REL[k];if(!S.
   box.innerHTML=relPP(k)+`<div class="rel-grid"><div>${relList(k)}</div><div>${relDet(k)}</div></div>`}
 function relLast(k,id){const c=REL_CFG[k];return REL[k].cts.find(x=>x[c.fk]===id)}
 function relList(k){const c=REL_CFG[k],S=REL[k];const q=fold(S.q||'');
-  const rows=S.rows.filter(r=>(!S.fs||r.status===S.fs)&&(!q||fold(Object.values(r).filter(v=>typeof v==='string').join(' ')).includes(q)));
+  const rows=S.rows.filter(r=>(!S.fl||(r.linhas||[]).includes(S.fl))&&(!S.fs||r.status===S.fs)&&(!q||fold(Object.values(r).filter(v=>typeof v==='string').join(' ')).includes(q)));
   return `<div class="rel-list"><div class="hd"><input type="search" placeholder="Buscar ${c.plural}" value="${esc(S.q)}" oninput="REL.${k}.q=this.value;relListOnly('${k}')"><button class="btn" type="button" onclick="relNew('${k}')">+ ${c.Ent}</button></div>
     <div class="fl">${[['','Todos'],...c.st].map(([v,l])=>`<button type="button" class="${S.fs===v?'on':''}" onclick="REL.${k}.fs='${v}';relRender('${k}')">${l} ${v?`<span style="opacity:.6">${S.rows.filter(r=>r.status===v).length}</span>`:''}</button>`).join('')}</div>
-    <div id="rel-${k}-items">${rows.map(r=>{const l=relLast(k,r.id);return `<div class="rel-it ${S.sel===r.id?'on':''}" onclick="relSel('${k}','${r.id}')"><div><b>${esc(r.nome)}</b><small>${esc(c.sub(r).filter(Boolean).join(' · ')||'—')}</small>${l?`<small>Último contato ${fDia(l.data_hora)} · ${canalNome(l.canal)}</small>`:''}</div><span class="st ${r.status}">${esc(relStNome(k,r.status))}</span></div>`}).join('')||`<div class="note" style="padding:14px">Nenhum ${c.ent} encontrado.</div>`}</div></div>`}
+    ${k==='crm'?`<div class="fl">${[['','Todas as linhas'],...LINHAS].map(([v,l])=>`<button type="button" class="${(S.fl||'')===v?'on':''}" onclick="REL.crm.fl='${v}';relRender('crm')">${l}</button>`).join('')}</div>`:''}<div id="rel-${k}-items">${rows.map(r=>{const l=relLast(k,r.id);return `<div class="rel-it ${S.sel===r.id?'on':''}" onclick="relSel('${k}','${r.id}')"><div><b>${esc(r.nome)}</b> ${linTags(r.linhas)}<small>${esc(c.sub(r).filter(Boolean).join(' · ')||'—')}</small>${l?`<small>Último contato ${fDia(l.data_hora)} · ${canalNome(l.canal)}</small>`:''}</div><span class="st ${r.status}">${esc(relStNome(k,r.status))}</span></div>`}).join('')||`<div class="note" style="padding:14px">Nenhum ${c.ent} encontrado.</div>`}</div></div>`}
 function relListOnly(k){const el=$('rel-'+k);const v=document.activeElement;const pos=v&&v.selectionStart;relRender(k);const i=el.querySelector('input[type=search]');if(i){i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}}
 function relSel(k,id){const S=REL[k];S.sel=id;S.edit=false;relRender(k)}
 function relNew(k){const S=REL[k];S.sel='__new';S.edit=true;relRender(k)}
@@ -1764,6 +1766,7 @@ function relPP(k){const c=REL_CFG[k],S=REL[k];const h=hojeISO();
   ${it.map(x=>{const d=x.data_proximo_passo;const cls=d&&d<h?'late':d===h?'today':'';return `<div class="pp-it ${cls}"><span class="d">${d?(d<h?'Atrasado · ':d===h?'Hoje · ':'')+fDia(d):'Sem data'}</span><div style="cursor:pointer" onclick="relSel('${k}','${x[c.fk]}')">${esc(x.proximo_passo)}<div class="who">${esc(nome(x[c.fk]))}</div></div><button type="button" onclick="relDone('${k}','${x.id}',true)" title="Marcar como concluído">✓ Concluir</button></div>`}).join('')||'<div class="note" style="padding:12px 16px">Nada pendente.</div>'}</div>`}
 function relField(k,d,v){const [f,l,t]=d;const id=`rf_${k}_${f}`;
   if(Array.isArray(t))return `<label>${l}<select id="${id}">${t.map(([a,b])=>`<option value="${a}" ${String(v??'')===a?'selected':''}>${b}</option>`).join('')}</select></label>`;
+  if(t==='tags')return `<label style="grid-column:1/-1">${l}<span style="display:flex;gap:14px;color:#1d1d1f;font-size:14px">${LINHAS.map(([a,b])=>`<span><input type="checkbox" name="${id}" value="${a}" ${(v||[]).includes(a)?'checked':''}> ${b}</span>`).join('')}</span></label>`;
   if(t==='ta')return `<label style="grid-column:1/-1">${l}<textarea id="${id}" rows="2">${esc(v||'')}</textarea></label>`;
   const val=t==='pct'?(v==null?'':fmtIn(Number(v)*100)):(v??'');
   return `<label>${l}<input id="${id}" value="${esc(String(val))}" ${t==='pct'?'inputmode="decimal"':''}></label>`}
@@ -1773,9 +1776,9 @@ function relDet(k){const c=REL_CFG[k],S=REL[k];
   if(S.edit)return `<div class="rel-det"><h3>${S.sel==='__new'?'Novo '+c.ent:'Editar '+esc(r.nome)}</h3><div class="ef">${c.f.map(d=>relField(k,d,r[d[0]])).join('')}${relField(k,['status','Status',c.st],r.status)}</div>
     <div style="display:flex;gap:8px"><button class="btn" type="button" onclick="relSave('${k}')">Salvar</button><button class="btn sec" type="button" onclick="REL.${k}.edit=false;if(REL.${k}.sel==='__new')REL.${k}.sel=null;relRender('${k}')">Cancelar</button></div></div>`;
   const cts=S.cts.filter(x=>x[c.fk]===r.id);
-  const meta=c.f.filter(d=>!['nome','obs'].includes(d[0])&&r[d[0]]!=null&&r[d[0]]!=='').map(d=>`<span>${d[1]}: <b>${esc(d[2]==='pct'?pct0(Number(r[d[0]])):Array.isArray(d[2])?relOpt(k,d[0],r[d[0]]):r[d[0]])}</b></span>`).join('');
+  const meta=c.f.filter(d=>!['nome','obs','linhas'].includes(d[0])&&r[d[0]]!=null&&r[d[0]]!=='').map(d=>`<span>${d[1]}: <b>${esc(d[2]==='pct'?pct0(Number(r[d[0]])):Array.isArray(d[2])?relOpt(k,d[0],r[d[0]]):r[d[0]])}</b></span>`).join('');
   const tel=r.telefone?String(r.telefone).replace(/\D/g,''):'';
-  return `<div class="rel-det"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><h3>${esc(r.nome)} <span class="st ${r.status}" style="vertical-align:middle">${esc(relStNome(k,r.status))}</span></h3></div>
+  return `<div class="rel-det"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><h3>${esc(r.nome)} ${linTags(r.linhas)} <span class="st ${r.status}" style="vertical-align:middle">${esc(relStNome(k,r.status))}</span></h3></div>
     <div style="display:flex;gap:6px">${tel?`<a class="btn sec" href="https://wa.me/${tel}" target="_blank" rel="noopener">WhatsApp</a>`:''}<button class="btn sec" type="button" onclick="REL.${k}.edit=true;relRender('${k}')">Editar</button></div></div>
     <div class="rel-meta">${meta||'<span>Sem dados de cadastro</span>'}</div>${r.obs?`<div class="note" style="margin:-4px 0 8px">${esc(r.obs)}</div>`:''}
     ${relQF(k)}
@@ -1792,7 +1795,7 @@ function relTl(k,x){const c=REL_CFG[k];const ex=[];
   ${x.proximo_passo?`<div class="np ${x.passo_concluido?'done':''}">→ ${esc(x.proximo_passo)}${x.data_proximo_passo?' · '+fDia(x.data_proximo_passo):''}</div>`:''}
   <div class="acts">${x.proximo_passo?`<a onclick="relDone('${k}','${x.id}',${!x.passo_concluido})">${x.passo_concluido?'Reabrir passo':'Concluir passo'}</a>`:''}${k==='crm'&&x.status==='aberto'?`<a onclick="relCtSt('${x.id}','fechado')">Marcar fechado</a><a onclick="relCtSt('${x.id}','perdido')">Perdido</a>`:''}<a style="color:var(--mut)" onclick="relDelCt('${k}','${x.id}')">Excluir</a></div></div>`}
 async function relSave(k){const c=REL_CFG[k],S=REL[k];const o={};
-  for(const [f,,t] of [...c.f,['status','',c.st]]){const el=$(`rf_${k}_${f}`);if(!el)continue;let v=el.value.trim();if(t==='pct'){if(v===''){o[f]=null;continue}const n=num(v);if(n==null||Number.isNaN(n)){toast('Percentual inválido',1);return}o[f]=n/100;continue}o[f]=v===''?null:v}
+  for(const [f,,t] of [...c.f,['status','',c.st]]){if(t==='tags'){o[f]=[...document.querySelectorAll(`input[name=rf_${k}_${f}]:checked`)].map(x=>x.value);continue}const el=$(`rf_${k}_${f}`);if(!el)continue;let v=el.value.trim();if(t==='pct'){if(v===''){o[f]=null;continue}const n=num(v);if(n==null||Number.isNaN(n)){toast('Percentual inválido',1);return}o[f]=n/100;continue}o[f]=v===''?null:v}
   if(!o.nome){toast('Informe o nome',1);return}if(o.uf)o.uf=o.uf.toUpperCase();o.updated_at=new Date().toISOString();
   const q=S.sel==='__new'?sb.from(c.t).insert(o).select().single():sb.from(c.t).update(o).eq('id',S.sel).select().single();
   const {data,error}=await q;if(error){toast('Erro ao salvar: '+error.message,1);return}
