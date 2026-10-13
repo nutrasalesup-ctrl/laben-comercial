@@ -1481,13 +1481,13 @@ function bfEval(items,e,hasEsp,A,v){
   return {r,k,need:k==null?null:k-1,emp:k==null?null:A.m/mpr,intu,mIntu,ok:k!=null&&mIntu>=A.m-0.005}}
 /* ===== Black Friday escalonada: valor-alvo → faixa de bonificação ===== */
 const BFX_KEY='laben-bfx-v1';
-let BFX={alvo:null,tab:'esp',dc:0,regua:[{ate:5000,bon:10},{ate:10000,bon:15},{ate:null,bon:20}]};
+let BFX={alvo:null,bon:null,tab:'esp',dc:0,regua:[{ate:5000,bon:10},{ate:10000,bon:15},{ate:null,bon:20}]};
 try{const o=JSON.parse(localStorage.getItem(BFX_KEY)||'null');if(o&&Array.isArray(o.regua)&&o.regua.length)BFX=Object.assign(BFX,o)}catch(e){}
 function bfxSave(){localStorage.setItem(BFX_KEY,JSON.stringify(BFX))}
 function bfxSet(f,v){
   if(f==='tab')BFX.tab=v==='esp'?'esp':Number(v);
   else{const n=num(v);const ok=String(v).trim()!==''&&n!=null&&!Number.isNaN(n)&&n>=0;
-    if(f==='alvo')BFX.alvo=ok&&n>0?n:null;else BFX[f]=ok?Math.min(95,n):0}
+    if(f==='alvo')BFX.alvo=ok&&n>0?n:null;else if(f==='bon')BFX.bon=ok?Math.min(95,n):null;else BFX[f]=ok?Math.min(95,n):0}
   bfxSave();renderSim()}
 function bfxReg(i,f,v){const n=num(v);const ok=String(v).trim()!==''&&n!=null&&!Number.isNaN(n)&&n>=0;const t=BFX.regua[i];if(!t)return;
   if(f==='ate')t.ate=ok&&n>0?n:null;else t.bon=ok?Math.min(95,n):0;
@@ -1530,18 +1530,19 @@ function bfHtml(items,e,hasEsp,A){
   const semS=EMP==='lbr'&&lbrAliq()==null;
   const head=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px"><span class="note" style="font-size:12px;color:var(--mut)">Empresa</span>${empSel}</div>${strip}`;
   if(semS)return head+`<div class="bfv"><span class="tag no">Falta dado</span>LBR (Simples): informe a alíquota do Simples em Estados › Empresa.</div>`;
-  const r=bfxRun(items,e,BFX.alvo,null);
+  const r=bfxRun(items,e,BFX.alvo,BFX.bon);const bMan=BFX.bon!=null;const bSug=bfxTier(r.rec).bon;
   const blk=(t,x,ed,extra)=>`<div class="bfb"><h3>${t}</h3>${ed||''}<div class="kv">
     <span>Valor do pedido</span><b>${brl(x.rec)}</b>${extra||''}<span>Custo total</span><b>${brl(x.rec-x.m)}</b>
     <span>Margem R$</span><b class="big ${x.m<0?'c-bad':''}">${brl(x.m)}</b><span>Índice</span><b><span class="pill ${x.rec&&x.m/x.rec<0.1?'warn':'ok'}">${ip(x)}</span></b></div></div>`;
   const tabOpt=[['esp','Preço faturado (XML)'],...fxl.map(f=>[f.ordem,fxName(f.ordem)])];
   const ed=`<div class="ed"><label>Valor-alvo do pedido R$<input inputmode="decimal" placeholder="${fmtIn(Math.round(r.V0*100)/100)}" value="${BFX.alvo?fmtIn(BFX.alvo):''}" onchange="bfxSet('alvo',this.value)"></label>
     <label>Tabela de preço<select style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:14px inherit;font-family:inherit;background:#fff" onchange="bfxSet('tab',this.value)">${tabOpt.map(([v,l])=>`<option value="${v}" ${String(BFX.tab)===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
-    <label>Desconto %<input inputmode="decimal" value="${fmtIn(BFX.dc)}" onchange="bfxSet('dc',this.value)" style="max-width:90px"></label></div>`;
-  const extra=`<span>Bonificação por faixa</span><b style="font-weight:500;text-align:right">${pc(r.bp)} de ${brl(r.rec)} = <b>${brl(r.bonT)}</b> em produtos (${fmtIn(r.bun)} un.)<br><span style="font-size:11px;color:var(--mut)">${Math.abs(r.bonDiff)<0.005?'sem diferença de arredondamento':'unidades inteiras somam '+brl(r.bonV)+' ('+(r.bonDiff>0?'+':'−')+brl(Math.abs(r.bonDiff))+' de arredondamento)'}</span></b><span>Custo real para você</span><b>${brl(r.bonC)} <span style="font-size:11px;color:var(--mut);font-weight:400">(CMV + frete${EMP==='lbr'?'':' + ICMS'})</span></b>`;
+    <label>Desconto %<input inputmode="decimal" value="${fmtIn(BFX.dc)}" onchange="bfxSet('dc',this.value)" style="max-width:90px"></label>
+    <label>Bonificação %<input inputmode="decimal" value="${fmtIn(bMan?BFX.bon:bSug)}" onchange="bfxSet('bon',this.value)" style="max-width:90px${bMan?';border-color:var(--acc)':''}"><span style="font-size:11px;color:var(--mut);font-weight:400">${bMan?`manual · <a href="#" onclick="bfxSet('bon','');return false">usar faixa (${fmtIn(bSug)}%)</a>`:'sugestão da faixa'}</span></label></div>`;
+  const extra=`<span>Bonificação <span style="font-size:11px;color:var(--mut)">${bMan?'(manual)':'(sugestão da faixa)'}</span></span><b style="font-weight:500;text-align:right">${pc(r.bp)} de ${brl(r.rec)} = <b>${brl(r.bonT)}</b> em produtos (${fmtIn(r.bun)} un.)<br><span style="font-size:11px;color:var(--mut)">${Math.abs(r.bonDiff)<0.005?'sem diferença de arredondamento':'unidades inteiras somam '+brl(r.bonV)+' ('+(r.bonDiff>0?'+':'−')+brl(Math.abs(r.bonDiff))+' de arredondamento)'}</span></b><span>Custo real para você</span><b>${brl(r.bonC)} <span style="font-size:11px;color:var(--mut);font-weight:400">(CMV + frete${EMP==='lbr'?'':' + ICMS'})</span></b>`;
   const dm=r.m-A.m;const grow=A.rec?r.rec/A.rec-1:0;
   const mpr=r.rec?r.m/r.rec:0;const emp=mpr>0?A.m/mpr:null;
-  const ver=`<span class="tag ${dm>=-0.005?'ok':'no'}">${dm>=-0.005?'Faz sentido':'Não faz sentido'}</span>Pedido de <b>${brl(r.rec)}</b> (${grow>=0?'+':''}${pc(grow)} vs faturado) com <b>${pc(r.bp)} de bonificação</b>: margem ${brl(r.m)}, ${dm>=0?'+':'−'}${brl(Math.abs(dm))} vs a margem do faturado (${brl(A.m)}).${emp?` Para empatar nessa condição, o pedido precisa de <b>${brl(emp)}</b>${bfxTier(emp).bon/100!==r.bp?' (cai em outra faixa de bonificação)':''}.`:''}`;
+  const ver=`<span class="tag ${dm>=-0.005?'ok':'no'}">${dm>=-0.005?'Faz sentido':'Não faz sentido'}</span>Pedido de <b>${brl(r.rec)}</b> (${grow>=0?'+':''}${pc(grow)} vs faturado) com <b>${pc(r.bp)} de bonificação</b>: margem ${brl(r.m)}, ${dm>=0?'+':'−'}${brl(Math.abs(dm))} vs a margem do faturado (${brl(A.m)}).${emp?` Para empatar nessa condição, o pedido precisa de <b>${brl(emp)}</b>${!bMan&&bfxTier(emp).bon/100!==r.bp?' (cai em outra faixa de bonificação)':''}.`:''}`;
   /* faixas de bonificação editável + progressão */
   const tiers=BFX.regua;let prev=0;
   const rows=tiers.map((t,i)=>{const lo=prev;const hi=t.ate;prev=hi||prev;
