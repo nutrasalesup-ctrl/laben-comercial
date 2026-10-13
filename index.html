@@ -197,6 +197,28 @@ tr.miss td{background:#fff8f7}
 .empbox input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:14px inherit;font-family:inherit;text-align:right;font-variant-numeric:tabular-nums}
 .empbox .note{grid-column:1/-1;font-size:12px;color:var(--mut)}
 .ufstrip .need{color:var(--bad);background:var(--bad-bg);border-radius:999px;padding:2px 10px;font-weight:600}
+/* Black Friday simples */
+.bf2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 0}
+.bfb{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:20px 22px}
+.bfb h3{margin:0 0 14px;font-size:15px;font-weight:600}
+.bfb .kv{display:grid;grid-template-columns:1fr auto;gap:10px 12px;font-size:14px}
+.bfb .kv span{color:var(--mut)}.bfb .kv b{font-variant-numeric:tabular-nums;text-align:right;font-weight:500}
+.bfb .kv b.big{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.bfb .ed{display:flex;gap:10px;margin:-4px 0 14px}
+.bfb .ed label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--mut);font-weight:500}
+.bfb .ed input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:15px inherit;font-family:inherit;text-align:right;font-variant-numeric:tabular-nums}
+.bfv{margin:14px 0 0;padding:14px 18px;border-radius:14px;font-size:14px;line-height:1.5;background:#fff;box-shadow:var(--sh)}
+.bfv .tag{display:inline-block;border-radius:999px;padding:2px 10px;font-weight:600;font-size:12px;margin-right:8px}
+.bfv .ok{background:var(--ok-bg,#e8f7ee);color:var(--ok,#1a7f37)}.bfv .no{background:var(--bad-bg);color:var(--bad)}
+.bft{margin-top:14px}
+.bft table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.bft td,.bft th{padding:10px 14px;border-bottom:1px solid var(--line);text-align:left}
+.bft th{font-size:11px;color:var(--mut);font-weight:500;position:static;background:#fafafc;backdrop-filter:none;-webkit-backdrop-filter:none;z-index:auto}
+.bft td.n,.bft th.n{text-align:right;font-variant-numeric:tabular-nums}
+.bft tr.best td{background:#eef5ff}
+.bft input{width:58px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;text-align:right;font:13px inherit;font-family:inherit}
+.bfmore{margin:12px 0 0;text-align:center}
+@media(max-width:820px){.bf2{grid-template-columns:1fr}}
 /* NF-e */
 .nfbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:14px 0 0;padding:12px 16px;background:#fff;border-radius:14px;box-shadow:var(--sh);font-size:13px;color:var(--mut)}
 .nfbar b{color:#1d1d1f;font-weight:600}
@@ -390,10 +412,13 @@ tr.row.off .pn{font-weight:400}
       </div>
     </div>
     <div class="nfbar hide" id="sNf"></div>
+    <div id="sBF" class="hide"></div>
+    <div id="sDet">
     <div class="ufstrip" id="sUfBar"></div>
     <div class="scs" id="sC"></div>
     <div class="cond" style="font-size:12px;margin:-6px 0 12px">Índice = margem % ÷ 10. Bonificação: receita zero, custo = CMV + ICMS (Nutríssima) ou CMV + Simples sobre bonificação (LBR) + frete sobre o valor de tabela, sem PIS/COFINS. Empate = tamanho de pedido (R$) que iguala a margem R$ do Atual com aquela condição.</div>
     <div class="tcard"><div class="tscroll"><table><thead id="sH"></thead><tbody id="sB"></tbody></table></div></div>
+    </div>
   </section>
 
   <!-- NEGOCIAÇÃO -->
@@ -1439,6 +1464,43 @@ function setEmp(v){EMP=v==='lbr'?'lbr':'nutrissima';localStorage.setItem('laben-
   if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();
   if(typeof OPEN!=='undefined'&&OPEN&&typeof renderDrawer==='function')renderDrawer();}
 
+/* ===== Black Friday: comparação simples XML × campanha ===== */
+const BF_KEY='laben-bf-v1';
+let BF=[{dc:0,bon:15},{dc:0,bon:20},{dc:15,bon:0}];try{const o=JSON.parse(localStorage.getItem(BF_KEY)||'null');if(Array.isArray(o)&&o.length)BF=o}catch(e){}
+let SIMDET=localStorage.getItem('laben-sim-det')==='1';
+function bfSave(){localStorage.setItem(BF_KEY,JSON.stringify(BF))}
+function bfSet(i,f,v){const n=num(v);BF[i][f]=(String(v).trim()===''||n==null||Number.isNaN(n))?0:Math.min(95,Math.max(0,n));bfSave();renderSim()}
+function bfTop(i){const x=BF.splice(i,1)[0];BF.unshift(x);bfSave();renderSim()}
+function simDetToggle(){SIMDET=!SIMDET;localStorage.setItem('laben-sim-det',SIMDET?'1':'0');renderSim()}
+function bfLabel(v){const p=[];const pc=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:2});if(v.bon>0)p.push(pc(v.bon)+'% de bonificação');if(v.dc>0)p.push(pc(v.dc)+'% de desconto');return p.length?p.join(' e '):'sem concessão'}
+function bfEval(items,e,hasEsp,A,v){
+  const s=simNew({faixa:'esp',itemBon:SIMA.itemBon,dc:v.dc,bon:v.bon});const r=simRun(items,e,s,hasEsp);
+  const mpr=r.rec?r.m/r.rec:0;const k=mpr>0&&A.m>0?A.m/r.m:null; /* volume necessário = margem atual ÷ margem do cenário */
+  const intu=(Number(v.bon)||0)+(Number(v.dc)||0);  /* % "intuitiva": cresce o mesmo % da concessão */
+  const mIntu=r.m*(1+intu/100);
+  return {r,k,need:k==null?null:k-1,emp:k==null?null:A.m/mpr,intu,mIntu,ok:k!=null&&mIntu>=A.m-0.005}}
+function bfHtml(items,e,hasEsp,A){
+  const semS=EMP==='lbr'&&lbrAliq()==null;
+  if(semS)return `<div class="bfv"><span class="tag no">Falta dado</span>LBR (Simples): informe a alíquota do Simples em Estados › Empresa para comparar margens.</div>`;
+  const ev=BF.map(v=>bfEval(items,e,hasEsp,A,v));const m=ev[0],v0=BF[0];
+  const ip=r=>r.rec?idx(r.m/r.rec):'—';const pc=x=>(x*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+  const blk=(t,r,ed)=>`<div class="bfb"><h3>${t}</h3>${ed||''}<div class="kv">
+    <span>Valor do pedido</span><b>${brl(r.rec)}</b><span>Custo total</span><b>${brl(r.rec-r.m)}</b>
+    <span>Margem R$</span><b class="big ${r.m<0?'c-bad':''}">${brl(r.m)}</b><span>Índice</span><b><span class="pill ${r.rec&&r.m/r.rec<0.1?'warn':'ok'}">${ip(r)}</span></b></div></div>`;
+  const ed=`<div class="ed"><label>Desconto %<input inputmode="decimal" value="${fmtIn(v0.dc)}" onchange="bfSet(0,'dc',this.value)"></label><label>Bonificação %<input inputmode="decimal" value="${fmtIn(v0.bon)}" onchange="bfSet(0,'bon',this.value)"></label></div>`;
+  const ver=m.need==null?`<span class="tag no">Não faz sentido</span>Com ${bfLabel(v0)}, a margem do pedido fica zerada ou negativa.`
+    :m.need<=0.0005?`<span class="tag ok">Faz sentido</span>Com ${bfLabel(v0)}, a margem em R$ não cai.`
+    :`<span class="tag ${m.ok?'ok':'no'}">${m.ok?'Faz sentido':'Não faz sentido'}</span>Com ${bfLabel(v0)}, o pedido precisa ser <b>${pc(m.need)} maior (${brl(m.emp)})</b> para manter a mesma margem em R$ do pedido faturado (${brl(A.m)}). ${m.intu?`Se o cliente crescer só ${m.intu.toLocaleString('pt-BR')}%, a margem fica em ${brl(m.mIntu)}.`:''}`;
+  let tbl='';
+  if(BF.length>1){const bi=ev.reduce((b,x,i)=>x.r.m>ev[b].r.m?i:b,0);
+    tbl=`<div class="bft"><table><thead><tr><th>Cenário</th><th class="n">Desc. %</th><th class="n">Bonif. %</th><th class="n">Margem R$</th><th class="n">Crescimento necessário</th><th>Veredito</th></tr></thead><tbody>
+    ${ev.map((x,i)=>`<tr class="${i===bi?'best':''}"><td><a href="#" onclick="bfTop(${i});return false" title="Abrir no bloco">${esc(bfLabel(BF[i]))}</a>${i===bi?' <span class="tag" style="font-size:11px;color:#fff;background:var(--acc);border-radius:999px;padding:1px 8px">melhor</span>':''}</td>
+      <td class="n"><input inputmode="decimal" value="${fmtIn(BF[i].dc)}" onchange="bfSet(${i},'dc',this.value)"></td><td class="n"><input inputmode="decimal" value="${fmtIn(BF[i].bon)}" onchange="bfSet(${i},'bon',this.value)"></td>
+      <td class="n">${brl(x.r.m)}</td><td class="n">${x.need==null?'—':(x.need<=0.0005?'0%':'+'+pc(x.need))}${x.intu?` <span class="muted">vs ${x.intu.toLocaleString('pt-BR')}% intuitivo</span>`:''}</td>
+      <td><span class="${x.ok?'c-ok':'c-bad'}" style="font-weight:600">${x.ok?'Faz sentido':'Não faz sentido'}</span></td></tr>`).join('')}</tbody></table></div>`}
+  return `<div class="bf2">${blk('Pedido faturado (XML)',A,'')}${blk('Mesmo pedido na Black Friday',m.r,ed)}</div><div class="bfv">${ver}</div>${tbl}
+    <div class="note" style="margin-top:8px;font-size:11px;color:var(--mut2)">Bonificação custa ${EMP==='lbr'?'CMV + frete':'CMV + ICMS + frete'} sobre o preço de tabela, não o preço cheio. "Faz sentido" = crescendo a mesma % da concessão, a margem R$ alcança a do faturado.</div>`}
+
 function simFx(s,hasEsp){return s.faixa==null?(hasEsp?'esp':'cur'):(s.faixa==='esp'&&!hasEsp?'cur':s.faixa)}
 function simRun(items,e,s,hasEsp){
   const fx=simFx(s,hasEsp);const ord=typeof fx==='number'?fx:NFAIXA;
@@ -1472,6 +1534,10 @@ function renderSim(){
   const hasEsp=items.some(x=>x.it.preco!=null&&x.tab!=null&&Math.abs(x.it.preco-x.tab)>0.004);
   const A=simRun(items,e,SIMA,hasEsp);
   const res=SIM.map(s=>simRun(items,e,s,hasEsp));
+  const simple=!!NFMETA;
+  $('sBF').classList.toggle('hide',!simple);
+  if(simple)$('sBF').innerHTML=bfHtml(items,e,hasEsp,A)+`<div class="bfmore"><button class="btn sec tiny" type="button" onclick="simDetToggle()">${SIMDET?'Ocultar detalhes':'Ver detalhes'}</button></div>`;
+  $('sDet').classList.toggle('hide',simple&&!SIMDET);
   const all=[A,...res];const best=(EMP==='lbr'&&lbrAliq()==null)?-1:all.reduce((bi,x,i)=>x.m>all[bi].m?i:bi,0);
   const sg=v=>(v>0?'+':v<0?'−':'')+brl(Math.abs(v));
   const pc=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2});
