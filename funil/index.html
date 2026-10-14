@@ -1,0 +1,76 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Funil B2B · Nutríssima / LBR</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--tx:#1d1d1f;--mu:#6e6e73;--ac:#0071e3;--ln:#e5e5ea}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
+header{position:sticky;top:0;z-index:5;backdrop-filter:saturate(180%) blur(20px);background:rgba(245,245,247,.8);border-bottom:1px solid var(--ln);padding:14px 28px;display:flex;justify-content:space-between;align-items:center}
+h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.02em}h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:32px 0 12px}
+main{max-width:1180px;margin:0 auto;padding:8px 28px 60px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.card{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card .n{font-size:34px;font-weight:600;letter-spacing:-.03em}.card .l{color:var(--mu);font-size:13px;text-transform:capitalize}
+.panel{background:var(--card);border-radius:18px;padding:6px 0;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:11px 18px;border-bottom:1px solid var(--ln)}th{color:var(--mu);font-weight:500;font-size:12px}
+tbody tr{cursor:pointer}tbody tr:hover{background:#f9f9fb}tr:last-child td{border-bottom:0}
+input,select,textarea{font:inherit;border:1px solid var(--ln);border-radius:10px;padding:9px 12px;background:#fff;color:var(--tx)}textarea{width:100%;min-height:70px}
+button{font:inherit;border:0;border-radius:980px;padding:9px 18px;background:var(--ac);color:#fff;cursor:pointer}button.sec{background:#e8e8ed;color:var(--tx)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.pill{display:inline-block;padding:3px 10px;border-radius:980px;background:#eef4ff;color:var(--ac);font-size:12px;text-transform:capitalize}
+.mu{color:var(--mu)}.empty{padding:18px;color:var(--mu)}
+#login{max-width:380px;margin:12vh auto;text-align:center}#login input{width:100%;margin:16px 0}
+#drawer{position:fixed;top:0;right:0;width:min(520px,100%);height:100%;background:#fff;box-shadow:-10px 0 40px rgba(0,0,0,.12);transform:translateX(105%);transition:.3s;overflow:auto;padding:28px;z-index:10}#drawer.open{transform:none}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}.it{border-bottom:1px solid var(--ln);padding:10px 0;font-size:14px}
+</style></head><body>
+<div id="login" hidden><h1 style="font-size:32px">Funil B2B</h1><p class="mu">Entre com seu e-mail para receber o link de acesso.</p>
+<input id="em" type="email" placeholder="voce@empresa.com.br"><button onclick="sendLink()">Enviar link</button><p id="lmsg" class="mu"></p></div>
+<div id="app" hidden>
+<header><h1>Funil B2B · Nutríssima / LBR</h1><div><span id="who" class="mu"></span> <button class="sec" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></div></header>
+<main>
+<h2>Funil</h2><div class="cards" id="cards"></div>
+<h2>Tarefas de hoje</h2><div class="panel"><table><thead><tr><th>Empresa</th><th>Etapa</th><th>Próximo passo</th><th>Data</th><th>Responsável</th></tr></thead><tbody id="tasks"></tbody></table></div>
+<h2>Empresas</h2>
+<div class="bar"><input id="q" placeholder="Buscar nome ou cidade" oninput="renderEmp()"><select id="fs" onchange="renderEmp()"><option value="">Todos os segmentos</option></select>
+<select id="fp" onchange="renderEmp()"><option value="">Toda prioridade</option><option>A</option><option>B</option><option>C</option></select></div>
+<div class="panel"><table><thead><tr><th>Empresa</th><th>Segmento</th><th>Cidade</th><th>Prioridade</th><th>Etapa</th><th>WhatsApp</th></tr></thead><tbody id="emps"></tbody></table></div>
+</main></div>
+<div id="drawer"></div>
+<script>
+const SUPABASE_URL='https://cjwurpumthjumtgjjolt.supabase.co', SUPABASE_KEY='sb_publishable_Fh7hleKcFk6JXnT_XnYFOQ_mB82kC6G';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{db:{schema:'erp'}});
+const ETAPAS=['novo','contatado','respondeu','amostra','proposta','cliente','perdido'];
+let EMP=[],FUN={};const $=id=>document.getElementById(id);
+const esc=s=>(s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fd=d=>d?new Date(d.length<=10?d+'T12:00':d).toLocaleDateString('pt-BR'):'—';
+async function sendLink(){const {error}=await sb.auth.signInWithOtp({email:$('em').value,options:{emailRedirectTo:location.href.split('#')[0]}});$('lmsg').textContent=error?error.message:'Link enviado. Confira seu e-mail.'}
+async function load(){
+ const [r,t,e,f]=await Promise.all([sb.from('resumo_funil').select('*'),sb.from('tarefas_hoje').select('*').order('data_proximo_passo'),sb.from('empresas').select('*').order('nome'),sb.from('funil').select('*')]);
+ const err=[r,t,e,f].find(x=>x.error);if(err){alert('Erro: '+err.error.message);return}
+ const tot={};r.data.forEach(x=>tot[x.etapa]=(tot[x.etapa]||0)+Number(x.qtd));
+ $('cards').innerHTML=ETAPAS.map(s=>`<div class="card"><div class="n">${tot[s]||0}</div><div class="l">${s}</div></div>`).join('');
+ $('tasks').innerHTML=t.data.length?t.data.map(x=>`<tr onclick="openEmp(${x.empresa_id})"><td>${esc(x.nome)}</td><td><span class="pill">${x.etapa}</span></td><td>${esc(x.proximo_passo)}</td><td>${fd(x.data_proximo_passo)}</td><td>${esc(x.responsavel)}</td></tr>`).join(''):'<tr><td colspan=5 class="empty">Nenhuma tarefa para hoje.</td></tr>';
+ EMP=e.data;FUN={};f.data.forEach(x=>FUN[x.empresa_id]=x);
+ const segs=[...new Set(EMP.map(x=>x.segmento).filter(Boolean))].sort(),cur=$('fs').value;
+ $('fs').innerHTML='<option value="">Todos os segmentos</option>'+segs.map(s=>`<option>${esc(s)}</option>`).join('');$('fs').value=cur;renderEmp()}
+function renderEmp(){const q=$('q').value.toLowerCase(),s=$('fs').value,p=$('fp').value;
+ const l=EMP.filter(x=>(!s||x.segmento===s)&&(!p||x.prioridade===p)&&(!q||(x.nome+' '+(x.cidade||'')).toLowerCase().includes(q)));
+ $('emps').innerHTML=l.map(x=>`<tr onclick="openEmp(${x.id})"><td><b>${esc(x.nome)}</b></td><td>${esc(x.segmento)}</td><td>${esc(x.cidade)}</td><td>${esc(x.prioridade)}</td><td><span class="pill">${FUN[x.id]?.etapa||'—'}</span></td><td>${esc(x.whatsapp)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">Nada encontrado.</td></tr>'}
+async function openEmp(id){const e=EMP.find(x=>x.id===id),f=FUN[id]||{};
+ const [c,i]=await Promise.all([sb.from('contatos').select('*').eq('empresa_id',id),sb.from('interacoes').select('*').eq('empresa_id',id).order('data',{ascending:false})]);
+ $('drawer').innerHTML=`<div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(e.nome)}</h2><button class="sec" onclick="$('drawer').classList.remove('open')">Fechar</button></div>
+ <p class="mu">${esc(e.segmento)} · ${esc(e.cidade)}/${esc(e.uf)} · Prioridade ${esc(e.prioridade)}</p>
+ <p style="font-size:14px">${e.site?`🌐 ${esc(e.site)}<br>`:''}${e.instagram?`📷 ${esc(e.instagram)}<br>`:''}${e.telefone?`☎️ ${esc(e.telefone)}<br>`:''}${e.whatsapp?`💬 ${esc(e.whatsapp)}<br>`:''}${e.email?`✉️ ${esc(e.email)}<br>`:''}<span class="mu">${esc(e.produto_alvo)}</span><br><span class="mu">${esc(e.prioridade_obs)}</span></p>
+ <h3>Etapa e próximo passo</h3>
+ <div class="row"><select id="d_et">${ETAPAS.map(s=>`<option ${s===f.etapa?'selected':''}>${s}</option>`).join('')}</select><input id="d_resp" placeholder="Responsável" value="${esc(f.responsavel)}"></div>
+ <div class="row"><input id="d_pp" style="flex:1" placeholder="Próximo passo" value="${esc(f.proximo_passo)}"><input id="d_dt" type="date" value="${f.data_proximo_passo||''}"></div>
+ <button onclick="saveFunil(${id})">Salvar</button>
+ <h3>Contatos</h3>${c.data?.length?c.data.map(x=>`<div class="it"><b>${esc(x.nome)}</b> <span class="mu">${esc(x.cargo)}</span><br>${esc(x.whatsapp)} ${esc(x.email)}</div>`).join(''):'<p class="mu">Nenhum contato.</p>'}
+ <h3>Nova interação</h3><div class="row"><select id="i_c"><option>whatsapp</option><option>email</option><option>ligacao</option><option>visita</option></select><select id="i_d"><option>enviada</option><option>recebida</option></select></div>
+ <textarea id="i_r" placeholder="Resumo"></textarea><div class="row"><button onclick="addInt(${id})">Registrar</button></div>
+ <h3>Histórico</h3>${i.data?.length?i.data.map(x=>`<div class="it"><span class="pill">${x.canal}</span> <span class="mu">${x.direcao||''} · ${new Date(x.data).toLocaleString('pt-BR')}</span><br>${esc(x.resumo)}</div>`).join(''):'<p class="mu">Sem interações.</p>'}`;
+ $('drawer').classList.add('open')}
+async function saveFunil(id){const v={etapa:$('d_et').value,responsavel:$('d_resp').value||null,proximo_passo:$('d_pp').value||null,data_proximo_passo:$('d_dt').value||null};
+ const {error}=FUN[id]?await sb.from('funil').update(v).eq('id',FUN[id].id):await sb.from('funil').insert({...v,empresa_id:id});if(error)return alert(error.message);await load();openEmp(id)}
+async function addInt(id){const r=$('i_r').value.trim();if(!r)return;const {error}=await sb.from('interacoes').insert({empresa_id:id,canal:$('i_c').value,direcao:$('i_d').value,resumo:r});if(error)return alert(error.message);openEmp(id)}
+sb.auth.onAuthStateChange((_e,s)=>show(s));sb.auth.getSession().then(({data})=>show(data.session));
+let shown=null;function show(s){const k=s?'app':'login';if(shown===k)return;shown=k;$('login').hidden=!!s;$('app').hidden=!s;if(s){$('who').textContent=s.user.email;load()}}
+</script></body></html>
