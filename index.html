@@ -420,6 +420,7 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="forn">Fornecedores</button>
       <button data-tab="rep">Representantes</button>
       <button data-tab="ai">Assuntos internos</button>
+      <button data-tab="di">Diário</button>
     </nav>
     <div class="hright">
       <div class="seg sm" id="empSeg" title="Empresa emissora"></div>
@@ -606,6 +607,11 @@ tr.row.off .pn{font-weight:400}
     <p class="psub">Custos, desenvolvimento, obras e decisões internas, com próximos passos.</p>
     <div id="rel-ai"></div>
   </section>
+  <section id="tab-di" class="hide">
+    <h2 class="ptitle">Diário</h2>
+    <p class="psub">Relatório diário: o que aconteceu em cada dia, contatos registrados e pendências.</p>
+    <div id="rel-di"></div>
+  </section>
   <section id="tab-estados" class="hide">
     <h2 class="ptitle">Estados</h2>
     <p class="psub">ICMS, PIS/COFINS, frete e condições comerciais por UF (origem SP).</p>
@@ -715,9 +721,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai','di'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();
 });
 
 async function fetchAll(table,orderBy){
@@ -1940,6 +1946,55 @@ async function aiSave(){const g=id=>$(id).value.trim();const o={titulo:g('ai_tit
   const {data,error}=await q;if(error){toast('Erro ao salvar: '+error.message,1);return}AI.sel=data.id;AI.edit=false;toast('Registro salvo');aiLoad()}
 async function aiDone(id,v){const {error}=await sb.from('assuntos_internos').update({passo_concluido:v,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}toast(v?'Passo concluído':'Passo reaberto');aiLoad()}
 async function aiDel(id){if(!confirm('Excluir este registro?'))return;const {error}=await sb.from('assuntos_internos').delete().eq('id',id);if(error){toast('Erro: '+error.message,1);return}AI.sel=null;aiLoad()}
+/* ---------- Diário ---------- */
+const DI={rows:[],sel:null,q:'',edit:false,loaded:false,ex:null};
+const diDia=s=>{const [y,m,d]=s.split('-').map(Number);const w=['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(y,m-1,d).getDay()];return w+', '+String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+y};
+const diLines=t=>(t||'').split('\n').map(x=>x.trim()).filter(Boolean);
+async function diLoad(){const {data,error}=await sb.from('relatorios_diarios').select('*').order('data',{ascending:false});
+  if(error){toast('Erro ao carregar diário: '+error.message,1);return}DI.rows=data||[];DI.loaded=true;if(DI.sel&&DI.sel!=='__new'&&!DI.rows.some(r=>r.data===DI.sel))DI.sel=null;diRender()}
+function diRender(){const box=$('rel-di');if(!box)return;if(!DI.loaded){box.innerHTML='<div class="note">Carregando…</div>';diLoad();return}
+  box.innerHTML=`<div class="rel-grid ${DI.sel?'open':''}"><div>${diList()}</div><div>${diDet()}</div></div>`;
+  if(DI.sel&&DI.sel!=='__new'&&!DI.edit)diExtras(DI.sel)}
+function diList(){const q=fold(DI.q||'');const rows=DI.rows.filter(r=>!q||fold([r.data,r.titulo,r.resumo,r.destaques,r.pendencias].join(' ')).includes(q));
+  return `<div class="rel-list"><div class="hd"><input type="search" placeholder="Buscar nos relatórios" value="${esc(DI.q)}" oninput="DI.q=this.value;diListOnly()"><button class="btn" type="button" onclick="diNew()">+ Hoje</button></div>
+  <div>${rows.map(r=>`<div class="rel-it ${DI.sel===r.data?'on':''}" onclick="diSel('${r.data}')"><div><b>${esc(diDia(r.data))}</b><small>${esc(diLines(r.destaques)[0]||diLines(r.resumo)[0]||'').slice(0,90)}</small></div></div>`).join('')||'<div class="note" style="padding:14px">Nenhum relatório.</div>'}</div></div>`}
+function diListOnly(){const p=document.activeElement&&document.activeElement.selectionStart;diRender();const i=$('rel-di').querySelector('input[type=search]');if(i){i.focus();try{i.setSelectionRange(p,p)}catch(e){}}}
+function diSel(d){DI.sel=d;DI.edit=false;diRender();if(innerWidth<=820)$('rel-di').querySelector('.rel-grid').scrollIntoView({block:'start'})}
+function diNew(){const h=hojeISO();DI.sel=DI.rows.some(r=>r.data===h)?h:'__new';DI.edit=true;diRender()}
+function diBl(t,txt,list){const l=list?diLines(txt):null;if(!txt||!txt.trim())return '';return `<h4 style="margin:18px 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">${t}</h4>`+(list?`<ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6">${l.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${esc(txt)}</div>`)}
+function diDet(){const back=`<button type="button" class="mback" onclick="DI.sel=null;DI.edit=false;diRender();window.scrollTo(0,0)">‹ Diário</button>`;
+  if(!DI.sel)return `<div class="rel-det"><div class="note" style="text-align:center;padding:60px 0">Selecione um dia à esquerda ou crie o relatório de hoje.</div></div>`;
+  const novo=DI.sel==='__new';const r=novo?{data:hojeISO()}:DI.rows.find(x=>x.data===DI.sel);if(!r)return '';
+  if(DI.edit)return back+`<div class="rel-det"><h3>${novo?'Novo relatório do dia':'Editar relatório'}</h3><div class="ef">
+    <label>Data<input id="di_data" type="date" value="${r.data}" ${novo?'':'disabled'}></label><label>Título<input id="di_titulo" value="${esc(r.titulo||'')}"></label>
+    <label style="grid-column:1/-1">Resumo do dia<textarea id="di_resumo" rows="6">${esc(r.resumo||'')}</textarea></label>
+    <label style="grid-column:1/-1">Destaques (uma linha por item)<textarea id="di_dest" rows="4">${esc(r.destaques||'')}</textarea></label>
+    <label style="grid-column:1/-1">Pendências para o dia seguinte (uma linha por item)<textarea id="di_pend" rows="4">${esc(r.pendencias||'')}</textarea></label>
+    <label style="grid-column:1/-1">Fonte<input id="di_fonte" value="${esc(r.fonte||'')}"></label></div>
+    <div style="display:flex;gap:8px"><button class="btn" type="button" onclick="diSave()">Salvar</button><button class="btn sec" type="button" onclick="DI.edit=false;if(DI.sel==='__new')DI.sel=null;diRender()">Cancelar</button></div></div>`;
+  return back+`<div class="rel-det"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><h3>${esc(diDia(r.data))}</h3><div style="display:flex;gap:6px"><button class="btn sec" type="button" onclick="DI.edit=true;diRender()">Editar</button><button class="btn sec" type="button" onclick="diDel('${r.data}')">Excluir</button></div></div>
+    ${r.fonte?`<div class="rel-meta"><span>${esc(r.fonte)}</span></div>`:''}
+    ${diBl('Resumo',r.resumo,false).replace(/white-space:pre-wrap/,'white-space:pre-wrap')}${diBl('Destaques',r.destaques,true)}${diBl('Pendências para o dia seguinte',r.pendencias,true)}
+    <div id="di-ex"><div class="note" style="margin-top:18px">Carregando contatos do dia…</div></div></div>`}
+async function diExtras(d){const a=d+'T00:00:00-03:00',b=new Date(new Date(a).getTime()+864e5).toISOString();
+  const T=[['contatos','cliente_id','clientes','CRM'],['contatos_fornecedor','fornecedor_id','fornecedores','Fornecedor'],['contatos_representante','representante_id','representantes','Representante']];
+  const out=[],steps=[];
+  for(const [t,fk,et,lab] of T){
+    const [c,s]=await Promise.all([sb.from(t).select('*').gte('data_hora',a).lt('data_hora',b).order('data_hora'),sb.from(t).select('*').eq('data_proximo_passo',d)]);
+    const ids=[...new Set([...(c.data||[]),...(s.data||[])].map(x=>x[fk]))];let nm={};
+    if(ids.length){const e=await sb.from(et).select('id,nome').in('id',ids);(e.data||[]).forEach(x=>nm[x.id]=x.nome)}
+    (c.data||[]).forEach(x=>out.push({...x,lab,nome:nm[x[fk]]||'—'}));(s.data||[]).filter(x=>x.proximo_passo).forEach(x=>steps.push({...x,lab,nome:nm[x[fk]]||'—'}))}
+  if(DI.sel!==d||DI.edit)return;const box=$('di-ex');if(!box)return;
+  out.sort((x,y)=>x.data_hora.localeCompare(y.data_hora));
+  const hh=s=>new Date(s).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+  box.innerHTML=`<h4 style="margin:18px 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">Contatos registrados no dia (${out.length})</h4>`+
+   (out.length?out.map(x=>`<div class="pp-it" style="grid-template-columns:56px 1fr"><span class="d">${hh(x.data_hora)}</span><div><b>${esc(x.nome)}</b> <span class="note">· ${esc(x.lab)}${x.canal?' · '+esc(x.canal):''}</span><div style="font-size:14px">${esc(x.resumo||'')}</div></div></div>`).join(''):'<div class="note">Nenhum contato registrado neste dia.</div>')+
+   `<h4 style="margin:18px 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">Próximos passos com data neste dia (${steps.length})</h4>`+
+   (steps.length?steps.map(x=>`<div class="pp-it" style="grid-template-columns:1fr"><div><b>${esc(x.nome)}</b> <span class="note">· ${esc(x.lab)}${x.passo_concluido?' · concluído':''}</span><div style="font-size:14px;${x.passo_concluido?'text-decoration:line-through;color:var(--mut)':''}">→ ${esc(x.proximo_passo)}</div></div></div>`).join(''):'<div class="note">Nenhum próximo passo agendado para este dia.</div>')}
+async function diSave(){const g=id=>$(id).value.trim();const data=g('di_data');if(!data){toast('Informe a data',1);return}
+  const o={data,titulo:g('di_titulo')||null,resumo:g('di_resumo')||null,destaques:g('di_dest')||null,pendencias:g('di_pend')||null,fonte:g('di_fonte')||null,atualizado_em:new Date().toISOString()};
+  const {error}=await sb.from('relatorios_diarios').upsert(o,{onConflict:'data'});if(error){toast('Erro ao salvar: '+error.message,1);return}DI.sel=data;DI.edit=false;toast('Relatório salvo');diLoad()}
+async function diDel(d){if(!confirm('Excluir o relatório deste dia?'))return;const {error}=await sb.from('relatorios_diarios').delete().eq('data',d);if(error){toast('Erro: '+error.message,1);return}DI.sel=null;diLoad()}
 /* ---------- navegação mobile ---------- */
 (function(){
   const NAV=[...document.querySelectorAll('#tabs button')].map(b=>[b.dataset.tab,b.textContent.trim()]);
