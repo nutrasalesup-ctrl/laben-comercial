@@ -293,6 +293,7 @@ tr.row.off .pn{font-weight:400}
 /* ---- CRM / Fornecedores / Representantes ---- */
 #tabs{overflow-x:auto;scrollbar-width:none;max-width:62vw}#tabs::-webkit-scrollbar{display:none}#tabs button{white-space:nowrap;padding-left:10px;padding-right:10px}
 .rel-list .hd input{min-width:0}
+#rel-at thead th{position:static}#rel-at tbody tr:hover td{background:var(--line2)}
 .rel-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
 @media(max-width:900px){.rel-grid{grid-template-columns:1fr}}
 .rel-list{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
@@ -421,6 +422,7 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="rep">Representantes</button>
       <button data-tab="ai">Assuntos internos</button>
       <button data-tab="di">Diário</button>
+      <button data-tab="at">Atendimentos</button>
     </nav>
     <div class="hright">
       <div class="seg sm" id="empSeg" title="Empresa emissora"></div>
@@ -612,6 +614,11 @@ tr.row.off .pn{font-weight:400}
     <p class="psub">Relatório diário: o que aconteceu em cada dia, contatos registrados e pendências.</p>
     <div id="rel-di"></div>
   </section>
+  <section id="tab-at" class="hide">
+    <h2 class="ptitle">Atendimentos</h2>
+    <p class="psub">WhatsApp (B2B Laben, Nutríssima, Site) e chats dos marketplaces. Quem espera resposta nossa há mais tempo aparece primeiro.</p>
+    <div id="rel-at"></div>
+  </section>
   <section id="tab-estados" class="hide">
     <h2 class="ptitle">Estados</h2>
     <p class="psub">ICMS, PIS/COFINS, frete e condições comerciais por UF (origem SP).</p>
@@ -721,9 +728,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai','di'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai','di','at'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();else if(TAB==='at')atRender();
 });
 
 async function fetchAll(table,orderBy){
@@ -1947,6 +1954,53 @@ async function aiSave(){const g=id=>$(id).value.trim();const o={titulo:g('ai_tit
 async function aiDone(id,v){const {error}=await sb.from('assuntos_internos').update({passo_concluido:v,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}toast(v?'Passo concluído':'Passo reaberto');aiLoad()}
 async function aiDel(id){if(!confirm('Excluir este registro?'))return;const {error}=await sb.from('assuntos_internos').delete().eq('id',id);if(error){toast('Erro: '+error.message,1);return}AI.sel=null;aiLoad()}
 /* ---------- Diário ---------- */
+/* ---------- atendimentos ---------- */
+const AT={rows:[],canais:[],msgs:[],sel:null,fc:'',fs:'abertos',loaded:false};
+const AT_ST={novo:'Novo',em_atendimento:'Em atendimento',aguardando_cliente:'Aguardando cliente',aguardando_nos:'Aguardando nós',resolvido:'Resolvido'};
+function atUteisH(a,b){/* horas úteis seg-sex 8h-18h entre a e b */let t=new Date(a),end=new Date(b),h=0;if(t>=end)return 0;
+  while(t<end){const d=t.getDay(),hr=t.getHours()+t.getMinutes()/60;const nx=new Date(Math.min(end,new Date(t.getFullYear(),t.getMonth(),t.getDate(),t.getHours()+1)));
+    if(d>0&&d<6&&hr>=8&&hr<18)h+=(nx-t)/36e5;t=nx}return h}
+function atEspera(r){return r.status!=='resolvido'&&(r.ultima_msg_de==='cliente'||r.status==='aguardando_nos'||r.status==='novo')&&r.ultima_msg_em}
+function atDur(ms){const m=Math.round(ms/6e4);if(m<60)return m+' min';const h=Math.floor(m/60);if(h<24)return h+'h'+String(m%60).padStart(2,'0');return Math.floor(h/24)+'d '+(h%24)+'h'}
+function atNivel(r){if(!atEspera(r))return '';const tot=(Date.now()-new Date(r.ultima_msg_em))/36e5;if(tot>24)return 'bad';if(atUteisH(r.ultima_msg_em,Date.now())>2)return 'warn';return ''}
+async function atLoad(){const [c,a]=await Promise.all([sb.from('canais_atendimento').select('*').order('nome'),sb.from('atendimentos').select('*')]);
+  if(c.error||a.error){toast('Erro ao carregar atendimentos: '+(c.error||a.error).message,1);return}AT.canais=c.data||[];AT.rows=a.data||[];AT.loaded=true;atRender()}
+function atReload(){AT.loaded=false;atRender()}
+const atCanal=id=>AT.canais.find(c=>c.id===id)||{nome:'?'};
+function atRender(){const box=$('rel-at');if(!box)return;if(!AT.loaded){box.innerHTML='<div class="note">Carregando…</div>';atLoad();return}
+  const now=Date.now();
+  const cards=AT.canais.filter(c=>c.ativo).map(c=>{const rs=AT.rows.filter(r=>r.canal_id===c.id&&r.status!=='resolvido');const w=rs.filter(atEspera);
+    const ws=w.map(r=>now-new Date(r.ultima_msg_em));const med=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:0;const max=ws.length?Math.max(...ws):0;
+    return `<div class="kpi" style="cursor:pointer;${AT.fc===c.id?'outline:2px solid var(--ink)':''}" onclick="AT.fc=AT.fc==='${c.id}'?'':'${c.id}';atRender()"><span>${esc(c.nome)}</span><b>${rs.length}</b><small>abertos · <em style="font-style:normal" class="${w.length?'c-warn':''}">${w.length} aguardando nós</em></small><small>${ws.length?'média '+atDur(med)+' · mais antigo <em style="font-style:normal" class="'+(max>864e5?'c-bad':'')+'">'+atDur(max)+'</em>':'sem espera'}</small></div>`}).join('');
+  let rows=AT.rows.filter(r=>(!AT.fc||r.canal_id===AT.fc)&&(AT.fs==='abertos'?r.status!=='resolvido':!AT.fs||r.status===AT.fs));
+  rows.sort((a,b)=>{const ea=atEspera(a),eb=atEspera(b);if(!!ea!==!!eb)return ea?-1:1;return new Date(a.ultima_msg_em||0)-new Date(b.ultima_msg_em||0)});
+  box.innerHTML=`<div class="kpis small" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">${cards}</div>
+  <div class="card" style="padding:0">
+  <div class="editp"><span class="flab">Canal</span><select onchange="AT.fc=this.value;atRender()"><option value="">Todos</option>${AT.canais.map(c=>`<option value="${c.id}" ${AT.fc===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select>
+  <span class="flab">Status</span><select onchange="AT.fs=this.value;atRender()"><option value="abertos" ${AT.fs==='abertos'?'selected':''}>Abertos</option><option value="" ${AT.fs===''?'selected':''}>Todos</option>${Object.entries(AT_ST).map(([k,v])=>`<option value="${k}" ${AT.fs===k?'selected':''}>${v}</option>`).join('')}</select>
+  <span style="flex:1"></span><button class="btn sec" type="button" onclick="atReload()">Recarregar</button></div>
+  <div style="overflow:auto"><table><thead><tr><th>Canal</th><th>Contato</th><th>Assunto</th><th>Status</th><th>Última msg</th><th>Há quanto tempo</th><th>Responsável</th><th>Próximo passo</th></tr></thead><tbody>
+  ${rows.map(r=>{const nv=atNivel(r);const ago=r.ultima_msg_em?atDur(now-new Date(r.ultima_msg_em)):'—';return `<tr style="cursor:pointer" onclick="atSel('${r.id}')"><td>${esc(atCanal(r.canal_id).nome)}</td><td><b>${esc(r.contato_nome||r.contato_telefone_ou_usuario)}</b>${r.nao_lidas?` <span class="pill warn" style="min-width:0;font-size:11px;padding:1px 7px">${r.nao_lidas}</span>`:''}<div class="ps">${esc(r.contato_telefone_ou_usuario)}</div></td><td>${esc(r.assunto||'')}</td><td>${esc(AT_ST[r.status]||r.status)}</td><td style="max-width:260px"><div class="ps" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.ultima_msg_de==='nos'?'Nós: ':''}${esc(r.ultima_msg_texto||'')}</div></td><td>${nv?`<span class="pill ${nv}">${ago}</span>`:`<span class="c-mut">${ago}</span>`}</td><td>${esc(r.responsavel||'')}</td><td>${esc(r.proximo_passo||'')}${r.proximo_passo_data?`<div class="ps">${r.proximo_passo_data.split('-').reverse().join('/')}</div>`:''}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Nenhum atendimento. Os agentes de WhatsApp e marketplaces alimentam esta lista.</td></tr>'}
+  </tbody></table></div></div>
+  <p class="note">Destaque amarelo: esperando resposta nossa há mais de 2h úteis (seg–sex, 8h–18h). Vermelho: mais de 24h.</p>
+  <div id="at-ov"></div>`;if(AT.sel)atDet()}
+async function atSel(id){AT.sel=id;AT.msgs=[];atDet();const {data}=await sb.from('atendimento_mensagens').select('*').eq('atendimento_id',id).order('em');if(AT.sel===id){AT.msgs=data||[];atDet()}}
+function atClose(){AT.sel=null;$('at-ov').innerHTML=''}
+function atDet(){const r=AT.rows.find(x=>x.id===AT.sel);const ov=$('at-ov');if(!r||!ov)return;const f=d=>new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  ov.innerHTML=`<div onclick="if(event.target===this)atClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:50;display:flex;justify-content:flex-end"><div style="background:#fff;width:min(520px,100%);height:100%;overflow:auto;padding:22px;box-shadow:var(--sh)">
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:18px">${esc(r.contato_nome||r.contato_telefone_ou_usuario)}</b><div class="ps">${esc(atCanal(r.canal_id).nome)} · ${esc(r.contato_telefone_ou_usuario)}</div></div><button class="btn sec" type="button" onclick="atClose()">Fechar</button></div>
+  <div class="ef" style="grid-template-columns:1fr 1fr;margin-top:16px">
+  <label>Status<select id="at_st">${Object.entries(AT_ST).map(([k,v])=>`<option value="${k}" ${r.status===k?'selected':''}>${v}</option>`).join('')}</select></label>
+  <label>Responsável<input id="at_resp" value="${esc(r.responsavel||'')}"></label>
+  <label style="grid-column:1/-1">Assunto<input id="at_ass" value="${esc(r.assunto||'')}"></label>
+  <label>Próximo passo<input id="at_pp" value="${esc(r.proximo_passo||'')}"></label><label>Data<input id="at_ppd" type="date" value="${r.proximo_passo_data||''}"></label>
+  <label style="grid-column:1/-1">Observações<textarea id="at_obs" rows="3">${esc(r.observacoes||'')}</textarea></label></div>
+  <button class="btn" type="button" onclick="atSave()">Salvar</button>
+  <h4 style="margin:22px 0 8px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">Histórico</h4>
+  ${(AT.msgs.length?AT.msgs:(r.ultima_msg_texto?[{em:r.ultima_msg_em,de:r.ultima_msg_de,texto:r.ultima_msg_texto}]:[])).map(m=>`<div style="margin:6px 0;display:flex;${m.de==='nos'?'justify-content:flex-end':''}"><div style="max-width:80%;padding:8px 12px;border-radius:14px;font-size:14px;background:${m.de==='nos'?'#e8f0fe':'var(--line2)'}">${esc(m.texto||'')}<div class="ps">${m.em?f(m.em):''}</div></div></div>`).join('')||'<div class="note">Sem mensagens registradas.</div>'}
+  </div></div>`}
+async function atSave(){const v=id=>$(id).value.trim()||null;const p={status:$('at_st').value,responsavel:v('at_resp'),assunto:v('at_ass'),proximo_passo:v('at_pp'),proximo_passo_data:v('at_ppd'),observacoes:v('at_obs')};
+  const {error}=await sb.from('atendimentos').update(p).eq('id',AT.sel);if(error){toast('Erro: '+error.message,1);return}Object.assign(AT.rows.find(x=>x.id===AT.sel),p);toast('Atendimento salvo');atRender()}
 const DI={rows:[],sel:null,q:'',edit:false,loaded:false,ex:null};
 const diDia=s=>{const [y,m,d]=s.split('-').map(Number);const w=['domingo','segunda','terça','quarta','quinta','sexta','sábado'][new Date(y,m-1,d).getDay()];return w+', '+String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+y};
 const diLines=t=>(t||'').split('\n').map(x=>x.trim()).filter(Boolean);
