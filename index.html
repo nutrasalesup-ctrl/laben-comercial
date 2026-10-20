@@ -422,7 +422,6 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="rep">Representantes</button>
       <button data-tab="ai">Assuntos internos</button>
       <button data-tab="di">Diário</button>
-      <button data-tab="at">Atendimentos</button>
     </nav>
     <div class="hright">
       <div class="seg sm" id="empSeg" title="Empresa emissora"></div>
@@ -614,11 +613,6 @@ tr.row.off .pn{font-weight:400}
     <p class="psub">Relatório diário: o que aconteceu em cada dia, contatos registrados e pendências.</p>
     <div id="rel-di"></div>
   </section>
-  <section id="tab-at" class="hide">
-    <h2 class="ptitle">Atendimentos</h2>
-    <p class="psub">WhatsApp (B2B Laben, Nutríssima, Site) e chats dos marketplaces. Quem espera resposta nossa há mais tempo aparece primeiro.</p>
-    <div id="rel-at"></div>
-  </section>
   <section id="tab-estados" class="hide">
     <h2 class="ptitle">Estados</h2>
     <p class="psub">ICMS, PIS/COFINS, frete e condições comerciais por UF (origem SP).</p>
@@ -728,9 +722,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai','di','at'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','simulador','crm','forn','rep','ai','di'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();else if(TAB==='at')atRender();
+  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();
 });
 
 async function fetchAll(table,orderBy){

@@ -20,19 +20,28 @@ button{font:inherit;border:0;border-radius:980px;padding:9px 18px;background:var
 #login{max-width:380px;margin:12vh auto;text-align:center}#login input{width:100%;margin:16px 0}
 #drawer{position:fixed;top:0;right:0;width:min(520px,100%);height:100%;background:#fff;box-shadow:-10px 0 40px rgba(0,0,0,.12);transform:translateX(105%);transition:.3s;overflow:auto;padding:28px;z-index:10}#drawer.open{transform:none}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}.it{border-bottom:1px solid var(--ln);padding:10px 0;font-size:14px}
+nav.tabs{display:flex;gap:4px;background:#e8e8ed;border-radius:980px;padding:3px}nav.tabs button{background:transparent;color:var(--tx);padding:6px 16px;font-size:14px}nav.tabs button.on{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.pill.warn{background:#fff4e0;color:#b25e00}.pill.bad{background:#ffe9e7;color:#c9271c}.pill.ok{background:#e8f8ee;color:#1a7f37}.pill.gray{background:#f0f0f3;color:var(--mu)}
+.ps{color:var(--mu);font-size:12px}.card.sel{outline:2px solid var(--ac)}.note{color:var(--mu);font-size:13px;margin:10px 4px}
+label{display:block;font-size:12px;color:var(--mu)}label input,label select,label textarea{display:block;width:100%;margin-top:4px;color:var(--tx)}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bub{max-width:80%;padding:8px 12px;border-radius:14px;font-size:14px;background:#f0f0f3;white-space:pre-wrap}.bub.nos{background:#e8f0fe}
+.prev{white-space:pre-wrap;background:#f5f5f7;border-radius:14px;padding:12px 14px;font-size:14px}button.danger{background:#e8e8ed;color:#c9271c}
+td input[type=checkbox]{width:18px;height:18px}
 </style></head><body>
 <div id="login" hidden><h1 style="font-size:32px">Funil B2B</h1><p class="mu">Entre com seu e-mail para receber o link de acesso.</p>
 <input id="em" type="email" placeholder="voce@empresa.com.br"><button onclick="sendLink()">Enviar link</button><p id="lmsg" class="mu"></p></div>
 <div id="app" hidden>
-<header><h1>Funil B2B · Nutríssima / LBR</h1><div><span id="who" class="mu"></span> <button class="sec" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></div></header>
-<main>
+<header><h1>Painel B2B · Nutríssima / LBR</h1><nav class="tabs"><button data-t="funil" class="on" onclick="tab(this.dataset.t)">Funil</button><button data-t="at" onclick="tab(this.dataset.t)">Atendimentos</button><button data-t="tx" onclick="tab(this.dataset.t)">Lista de transmissão</button></nav><div><span id="who" class="mu"></span> <button class="sec" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></div></header>
+<main id="v-funil">
 <h2>Funil</h2><div class="cards" id="cards"></div>
 <h2>Tarefas de hoje</h2><div class="panel"><table><thead><tr><th>Empresa</th><th>Etapa</th><th>Próximo passo</th><th>Data</th><th>Responsável</th></tr></thead><tbody id="tasks"></tbody></table></div>
 <h2>Empresas</h2>
 <div class="bar"><input id="q" placeholder="Buscar nome ou cidade" oninput="renderEmp()"><select id="fs" onchange="renderEmp()"><option value="">Todos os segmentos</option></select>
 <select id="fp" onchange="renderEmp()"><option value="">Toda prioridade</option><option>A</option><option>B</option><option>C</option></select></div>
 <div class="panel"><table><thead><tr><th>Empresa</th><th>Segmento</th><th>Cidade</th><th>Prioridade</th><th>Etapa</th><th>WhatsApp</th></tr></thead><tbody id="emps"></tbody></table></div>
-</main></div>
+</main>
+<main id="v-at" hidden><h2>Atendimentos</h2><p class="mu" style="margin-top:-6px">WhatsApp (B2B Laben, Nutríssima, Site) e chats dos marketplaces. Quem espera resposta nossa há mais tempo aparece primeiro.</p><div id="rel-at"></div></main>
+<main id="v-tx" hidden><h2>Lista de transmissão</h2><p class="mu" style="margin-top:-6px">Envios para os clientes B2B pela <b>Nutríssima (14) 99126-8228</b>. Toda campanha nasce aguardando aprovação e só o Nutra Sales aprova o envio. Saem uma a uma, com 2 a 3 min entre mensagens e no máximo 30 por dia.</p><div id="rel-tx"></div></main></div>
 <div id="drawer"></div>
 <script>
 const SUPABASE_URL='https://cjwurpumthjumtgjjolt.supabase.co', SUPABASE_KEY='sb_publishable_Fh7hleKcFk6JXnT_XnYFOQ_mB82kC6G';
@@ -71,6 +80,96 @@ async function openEmp(id){const e=EMP.find(x=>x.id===id),f=FUN[id]||{};
 async function saveFunil(id){const v={etapa:$('d_et').value,responsavel:$('d_resp').value||null,proximo_passo:$('d_pp').value||null,data_proximo_passo:$('d_dt').value||null};
  const {error}=FUN[id]?await sb.from('funil').update(v).eq('id',FUN[id].id):await sb.from('funil').insert({...v,empresa_id:id});if(error)return alert(error.message);await load();openEmp(id)}
 async function addInt(id){const r=$('i_r').value.trim();if(!r)return;const {error}=await sb.from('interacoes').insert({empresa_id:id,canal:$('i_c').value,direcao:$('i_d').value,resumo:r});if(error)return alert(error.message);openEmp(id)}
+const pub=sb.schema('public');const APROVADOR='nutrasalesup@gmail.com';let ME='';
+let TAB='funil';function tab(t){TAB=t;document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['funil','at','tx'].forEach(k=>$('v-'+k).hidden=k!==t);$('drawer').classList.remove('open');if(t==='at')atRender();if(t==='tx')txRender();history.replaceState(null,'','#'+t)}
+const closeDr=()=>$('drawer').classList.remove('open');
+/* ---------- Atendimentos ---------- */
+const AT={rows:[],canais:[],msgs:[],sel:null,fc:'',fs:'abertos',loaded:false};
+const AT_ST={novo:'Novo',em_atendimento:'Em atendimento',aguardando_cliente:'Aguardando cliente',aguardando_nos:'Aguardando nós',resolvido:'Resolvido'};
+function atUteisH(a,b){let t=new Date(a),end=new Date(b),h=0;if(t>=end)return 0;while(t<end){const d=t.getDay(),hr=t.getHours()+t.getMinutes()/60;const nx=new Date(Math.min(end,new Date(t.getFullYear(),t.getMonth(),t.getDate(),t.getHours()+1)));if(d>0&&d<6&&hr>=8&&hr<18)h+=(nx-t)/36e5;t=nx}return h}
+function atEspera(r){return r.status!=='resolvido'&&(r.ultima_msg_de==='cliente'||r.status==='aguardando_nos'||r.status==='novo')&&r.ultima_msg_em}
+function atDur(ms){const m=Math.round(ms/6e4);if(m<60)return m+' min';const h=Math.floor(m/60);if(h<24)return h+'h'+String(m%60).padStart(2,'0');return Math.floor(h/24)+'d '+(h%24)+'h'}
+function atNivel(r){if(!atEspera(r))return '';const tot=(Date.now()-new Date(r.ultima_msg_em))/36e5;if(tot>24)return 'bad';if(atUteisH(r.ultima_msg_em,Date.now())>2)return 'warn';return ''}
+async function atLoad(){const [c,a]=await Promise.all([pub.from('canais_atendimento').select('*').order('nome'),pub.from('atendimentos').select('*')]);if(c.error||a.error){alert('Erro ao carregar atendimentos: '+(c.error||a.error).message);return}AT.canais=c.data||[];AT.rows=a.data||[];AT.loaded=true;atRender()}
+const atCanal=id=>AT.canais.find(c=>c.id===id)||{nome:'?'};
+function atRender(){const box=$('rel-at');if(!AT.loaded){box.innerHTML='<p class="note">Carregando…</p>';atLoad();return}const now=Date.now();
+ const cards=AT.canais.filter(c=>c.ativo).map(c=>{const rs=AT.rows.filter(r=>r.canal_id===c.id&&r.status!=='resolvido');const w=rs.filter(atEspera);const ws=w.map(r=>now-new Date(r.ultima_msg_em));const med=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:0,max=ws.length?Math.max(...ws):0;
+  return `<div class="card ${AT.fc===c.id?'sel':''}" style="cursor:pointer" onclick="AT.fc=AT.fc==='${c.id}'?'':'${c.id}';atRender()"><div class="l" style="text-transform:none">${esc(c.nome)}</div><div class="n">${rs.length}</div><div class="ps">abertos · <span style="${w.length?'color:#b25e00':''}">${w.length} aguardando nós</span></div><div class="ps">${ws.length?'média '+atDur(med)+' · mais antigo '+atDur(max):'sem espera'}</div></div>`}).join('');
+ let rows=AT.rows.filter(r=>(!AT.fc||r.canal_id===AT.fc)&&(AT.fs==='abertos'?r.status!=='resolvido':!AT.fs||r.status===AT.fs));
+ rows.sort((a,b)=>{const ea=atEspera(a),eb=atEspera(b);if(!!ea!==!!eb)return ea?-1:1;return new Date(a.ultima_msg_em||0)-new Date(b.ultima_msg_em||0)});
+ box.innerHTML=`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">${cards}</div>
+ <div class="bar" style="margin-top:16px"><select onchange="AT.fc=this.value;atRender()"><option value="">Todos os canais</option>${AT.canais.map(c=>`<option value="${c.id}" ${AT.fc===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select>
+ <select onchange="AT.fs=this.value;atRender()"><option value="abertos" ${AT.fs==='abertos'?'selected':''}>Abertos</option><option value="" ${AT.fs===''?'selected':''}>Todos</option>${Object.entries(AT_ST).map(([k,v])=>`<option value="${k}" ${AT.fs===k?'selected':''}>${v}</option>`).join('')}</select><button class="sec" onclick="AT.loaded=false;atRender()">Recarregar</button></div>
+ <div class="panel"><table><thead><tr><th>Canal</th><th>Contato</th><th>Assunto</th><th>Status</th><th>Última msg</th><th>Há quanto tempo</th><th>Responsável</th><th>Próximo passo</th></tr></thead><tbody>
+ ${rows.map(r=>{const nv=atNivel(r),ago=r.ultima_msg_em?atDur(now-new Date(r.ultima_msg_em)):'—';return `<tr onclick="atSel('${r.id}')"><td>${esc(atCanal(r.canal_id).nome)}</td><td><b>${esc(r.contato_nome||r.contato_telefone_ou_usuario)}</b>${r.nao_lidas?` <span class="pill warn">${r.nao_lidas}</span>`:''}<div class="ps">${esc(r.contato_telefone_ou_usuario)}</div></td><td>${esc(r.assunto||'')}</td><td>${esc(AT_ST[r.status]||r.status)}</td><td style="max-width:260px"><div class="ps" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.ultima_msg_de==='nos'?'Nós: ':''}${esc(r.ultima_msg_texto||'')}</div></td><td>${nv?`<span class="pill ${nv}">${ago}</span>`:`<span class="mu">${ago}</span>`}</td><td>${esc(r.responsavel||'')}</td><td>${esc(r.proximo_passo||'')}${r.proximo_passo_data?`<div class="ps">${fd(r.proximo_passo_data)}</div>`:''}</td></tr>`}).join('')||'<tr><td colspan="8" class="empty">Nenhum atendimento.</td></tr>'}</tbody></table></div>
+ <p class="note">Amarelo: esperando resposta nossa há mais de 2h úteis (seg–sex, 8h–18h). Vermelho: mais de 24h.</p>`}
+async function atSel(id){AT.sel=id;AT.msgs=[];atDet();const {data}=await pub.from('atendimento_mensagens').select('*').eq('atendimento_id',id).order('em');if(AT.sel===id){AT.msgs=data||[];atDet()}}
+function atDet(){const r=AT.rows.find(x=>x.id===AT.sel);if(!r)return;const f=d=>new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+ const ms=AT.msgs.length?AT.msgs:(r.ultima_msg_texto?[{em:r.ultima_msg_em,de:r.ultima_msg_de,texto:r.ultima_msg_texto}]:[]);
+ $('drawer').innerHTML=`<div class="row" style="justify-content:space-between"><div><h2 style="margin:0">${esc(r.contato_nome||r.contato_telefone_ou_usuario)}</h2><div class="ps">${esc(atCanal(r.canal_id).nome)} · ${esc(r.contato_telefone_ou_usuario)}</div></div><button class="sec" onclick="closeDr()">Fechar</button></div>
+ <div class="grid2" style="margin-top:16px"><label>Status<select id="at_st">${Object.entries(AT_ST).map(([k,v])=>`<option value="${k}" ${r.status===k?'selected':''}>${v}</option>`).join('')}</select></label><label>Responsável<input id="at_resp" value="${esc(r.responsavel||'')}"></label>
+ <label style="grid-column:1/-1">Assunto<input id="at_ass" value="${esc(r.assunto||'')}"></label><label>Próximo passo<input id="at_pp" value="${esc(r.proximo_passo||'')}"></label><label>Data<input id="at_ppd" type="date" value="${r.proximo_passo_data||''}"></label>
+ <label style="grid-column:1/-1">Observações<textarea id="at_obs">${esc(r.observacoes||'')}</textarea></label></div><div class="row"><button onclick="atSave()">Salvar</button></div>
+ <h3>Histórico</h3>${ms.map(m=>`<div style="margin:6px 0;display:flex;${m.de==='nos'?'justify-content:flex-end':''}"><div class="bub ${m.de==='nos'?'nos':''}">${esc(m.texto||'')}<div class="ps">${m.em?f(m.em):''}</div></div></div>`).join('')||'<p class="mu">Sem mensagens registradas.</p>'}`;$('drawer').classList.add('open')}
+async function atSave(){const v=id=>$(id).value.trim()||null;const p={status:$('at_st').value,responsavel:v('at_resp'),assunto:v('at_ass'),proximo_passo:v('at_pp'),proximo_passo_data:v('at_ppd'),observacoes:v('at_obs')};
+ const {error}=await pub.from('atendimentos').update(p).eq('id',AT.sel);if(error)return alert('Erro: '+error.message);Object.assign(AT.rows.find(x=>x.id===AT.sel),p);atRender();atDet()}
+/* ---------- Lista de transmissão ---------- */
+const TX={camps:[],dest:[],opt:new Set(),hoje:0,loaded:false,novo:null};
+const TX_ST={aguardando_aprovacao:['Aguardando aprovação','warn'],aprovada:['Aprovada','ok'],enviando:['Enviando','ok'],concluida:['Concluída','gray'],pausada:['Pausada','warn'],cancelada:['Cancelada','gray'],erro:['Parada por erro','bad']};
+const D_ST={pendente:'Pendente',enviado:'Enviado',simulado:'Simulado',pulado_optout:'Pediu para sair',erro:'Erro'};
+const normTel=t=>{const d=(t||'').replace(/\D/g,'');return !d?null:(d.length===10||d.length===11)?'55'+d:d};
+async function txLoad(){const [c,d,o,h]=await Promise.all([sb.from('transmissoes').select('*').order('id',{ascending:false}),sb.from('transmissao_destinatarios').select('id,transmissao_id,status'),sb.from('optout').select('telefone'),sb.rpc('broadcast_enviados_hoje')]);
+ const e=[c,d,o].find(x=>x.error);if(e)return alert('Erro: '+e.error.message);TX.camps=c.data;TX.dest=d.data;TX.opt=new Set(o.data.map(x=>x.telefone));TX.hoje=h.data||0;TX.loaded=true;txRender()}
+function txRender(){const box=$('rel-tx');if(!TX.loaded){box.innerHTML='<p class="note">Carregando…</p>';txLoad();return}
+ const cnt=(id,st)=>TX.dest.filter(x=>x.transmissao_id===id&&(!st||x.status===st)).length;
+ box.innerHTML=`<div class="cards"><div class="card"><div class="n">${TX.hoje}<span class="mu" style="font-size:20px"> / 30</span></div><div class="l" style="text-transform:none">enviadas hoje</div></div><div class="card"><div class="n">${TX.camps.filter(c=>c.status==='aguardando_aprovacao').length}</div><div class="l" style="text-transform:none">aguardando aprovação</div></div><div class="card"><div class="n">${TX.opt.size}</div><div class="l" style="text-transform:none">pediram para sair</div></div></div>
+ <div class="bar" style="margin-top:16px"><button onclick="txNovo()">+ Nova campanha</button><button class="sec" onclick="TX.loaded=false;txRender()">Recarregar</button></div>
+ <div class="panel"><table><thead><tr><th>Campanha</th><th>Status</th><th>Destinatários</th><th>Enviadas</th><th>Criada</th><th>Aprovada</th></tr></thead><tbody>
+ ${TX.camps.map(c=>`<tr onclick="txAbrir(${c.id})"><td><b>${esc(c.nome)}</b><div class="ps" style="max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.mensagem)}</div></td><td><span class="pill ${TX_ST[c.status][1]}">${TX_ST[c.status][0]}</span></td><td>${cnt(c.id)}</td><td>${cnt(c.id,'enviado')}</td><td>${new Date(c.criado_em).toLocaleDateString('pt-BR')}</td><td>${c.aprovado_em?new Date(c.aprovado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhuma campanha ainda.</td></tr>'}</tbody></table></div>
+ <p class="note">Sempre pela Nutríssima. O envio só começa depois que o Nutra Sales clica em “Aprovar envio”. Quem responder SAIR ou PARAR sai da lista automaticamente.</p>`}
+async function txNovo(){if(!EMP.length)await load();const ct=(await sb.from('contatos').select('empresa_id,nome,whatsapp').not('whatsapp','is',null)).data||[];
+ const cands=[];EMP.forEach(e=>{const tels=new Map();if(normTel(e.whatsapp))tels.set(normTel(e.whatsapp),e.nome);ct.filter(c=>c.empresa_id===e.id).forEach(c=>{const t=normTel(c.whatsapp);if(t&&!tels.has(t))tels.set(t,e.nome+(c.nome?' · '+c.nome:''))});tels.forEach((n,t)=>cands.push({empresa_id:e.id,nome:n,telefone:t,seg:e.segmento,uf:e.uf,cidade:e.cidade,pri:e.prioridade,etapa:FUN[e.id]?.etapa||'',opt:TX.opt.has(t)}))});
+ TX.novo={cands,sel:new Set()};const segs=[...new Set(cands.map(x=>x.seg).filter(Boolean))].sort();
+ $('drawer').innerHTML=`<div class="row" style="justify-content:space-between"><h2 style="margin:0">Nova campanha</h2><button class="sec" onclick="closeDr()">Fechar</button></div>
+ <p class="ps">Remetente: Nutríssima (14) 99126-8228</p>
+ <label>Nome da campanha<input id="tx_nome" placeholder="Ex.: Black Friday padarias"></label>
+ <label style="margin-top:10px">Mensagem<textarea id="tx_msg" style="min-height:120px" oninput="txPrev()"></textarea></label>
+ <p class="ps" style="margin:6px 0 4px">Pré-visualização (o rodapé é incluído sempre):</p><div class="prev" id="tx_prev"></div>
+ <h3>Destinatários</h3><div class="bar"><select id="tf_seg" onchange="txFil()"><option value="">Todos os segmentos</option>${segs.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
+ <select id="tf_et" onchange="txFil()"><option value="">Toda etapa</option>${ETAPAS.map(s=>`<option>${s}</option>`).join('')}</select><select id="tf_pri" onchange="txFil()"><option value="">Toda prioridade</option><option>A</option><option>B</option><option>C</option></select>
+ <input id="tf_q" placeholder="Nome, cidade ou UF" oninput="txFil()" style="flex:1"></div>
+ <div class="row"><button class="sec" onclick="txTodos(true)">Selecionar os filtrados</button><button class="sec" onclick="txTodos(false)">Limpar</button><span id="tx_n" class="mu"></span></div>
+ <div class="panel" style="max-height:340px;border:1px solid var(--ln)"><table><tbody id="tx_list"></tbody></table></div>
+ <div class="row" style="margin-top:14px"><button onclick="txCriar()">Criar campanha para aprovação</button></div><p class="ps">A campanha fica “aguardando aprovação”. Nada é enviado até o Nutra Sales aprovar.</p>`;
+ $('drawer').classList.add('open');txPrev();txFil()}
+const RODAPE='Se não quiser mais receber, responda SAIR.';
+function txPrev(){$('tx_prev').textContent=($('tx_msg').value||'…')+'\n\n'+RODAPE}
+function txFiltrados(){const s=$('tf_seg').value,et=$('tf_et').value,p=$('tf_pri').value,q=$('tf_q').value.toLowerCase();return TX.novo.cands.filter(x=>(!s||x.seg===s)&&(!et||x.etapa===et)&&(!p||x.pri===p)&&(!q||[x.nome,x.cidade,x.uf].join(' ').toLowerCase().includes(q)))}
+function txFil(){const l=txFiltrados(),S=TX.novo.sel;$('tx_list').innerHTML=l.map(x=>`<tr style="cursor:default"><td style="width:30px"><input type="checkbox" ${x.opt?'disabled':''} ${S.has(x.telefone)?'checked':''} onchange="this.checked?TX.novo.sel.add('${x.telefone}'):TX.novo.sel.delete('${x.telefone}');txN()"></td><td><b>${esc(x.nome)}</b><div class="ps">${esc(x.seg||'')} · ${esc(x.cidade||'')}/${esc(x.uf||'')} · ${x.telefone}</div></td><td>${x.opt?'<span class="pill bad">Pediu para sair</span>':`<span class="pill">${x.etapa||'—'}</span>`}</td></tr>`).join('')||'<tr><td class="empty">Nada encontrado.</td></tr>';txN()}
+function txTodos(on){txFiltrados().forEach(x=>{if(x.opt)return;on?TX.novo.sel.add(x.telefone):TX.novo.sel.delete(x.telefone)});if(!on)TX.novo.sel.clear();txFil()}
+function txN(){$('tx_n').textContent=TX.novo.sel.size+' selecionados'}
+async function txCriar(){const nome=$('tx_nome').value.trim(),msg=$('tx_msg').value.trim();if(!nome||!msg)return alert('Preencha o nome e a mensagem.');if(!TX.novo.sel.size)return alert('Selecione ao menos um destinatário.');
+ const f={segmento:$('tf_seg').value||null,etapa:$('tf_et').value||null,prioridade:$('tf_pri').value||null,busca:$('tf_q').value||null};
+ const {data,error}=await sb.from('transmissoes').insert({nome,mensagem:msg,rodape:RODAPE,filtro:f}).select().single();if(error)return alert('Erro: '+error.message);
+ const rows=TX.novo.cands.filter(x=>TX.novo.sel.has(x.telefone)).map(x=>({transmissao_id:data.id,empresa_id:x.empresa_id,nome:x.nome,telefone:x.telefone}));
+ const r=await sb.from('transmissao_destinatarios').insert(rows);if(r.error)return alert('Erro: '+r.error.message);TX.loaded=false;txRender();txAbrir(data.id)}
+async function txAbrir(id){let c=TX.camps.find(x=>x.id===id);if(!c){c=(await sb.from('transmissoes').select('*').eq('id',id).single()).data}
+ const d=(await sb.from('transmissao_destinatarios').select('*').eq('transmissao_id',id).order('id')).data||[];const pend=d.filter(x=>x.status==='pendente').length;
+ const podeAprovar=ME===APROVADOR&&['aguardando_aprovacao','pausada'].includes(c.status);const dias=Math.ceil(pend/30);
+ $('drawer').innerHTML=`<div class="row" style="justify-content:space-between"><div><h2 style="margin:0">${esc(c.nome)}</h2><div class="ps">Remetente: Nutríssima (14) 99126-8228 · criada por ${esc(c.criado_por||'—')}</div></div><button class="sec" onclick="closeDr()">Fechar</button></div>
+ <p><span class="pill ${TX_ST[c.status][1]}">${TX_ST[c.status][0]}</span> ${c.aprovado_em?`<span class="ps">aprovada por ${esc(c.aprovado_por)} em ${new Date(c.aprovado_em).toLocaleString('pt-BR')}</span>`:''}</p>
+ ${c.erro?`<p class="pill bad" style="white-space:normal">${esc(c.erro)}</p>`:''}
+ <div class="prev">${esc(c.mensagem)}\n\n${esc(c.rodape)}</div>
+ <p class="ps">${d.length} destinatários · ${pend} pendentes${pend?` · cerca de ${dias} dia${dias>1?'s':''} útil${dias>1?'eis':''} de envio (máx. 30/dia, somando todas as campanhas)`:''}</p>
+ <div class="row">${podeAprovar?`<button onclick="txAprovar(${c.id},${pend})">Aprovar envio</button>`:''}
+ ${c.status==='aguardando_aprovacao'&&ME!==APROVADOR?'<span class="pill warn">Só o Nutra Sales pode aprovar</span>':''}
+ ${['aprovada','enviando'].includes(c.status)?`<button class="sec" onclick="txSt(${c.id},'pausada')">Pausar</button>`:''}
+ ${['aguardando_aprovacao','aprovada','enviando','pausada'].includes(c.status)?`<button class="danger" onclick="if(confirm('Cancelar a campanha?'))txSt(${c.id},'cancelada')">Cancelar</button>`:''}</div>
+ <h3>Destinatários</h3>${d.map(x=>`<div class="it"><b>${esc(x.nome||'')}</b> <span class="mu">${x.telefone}</span> <span class="pill ${x.status==='enviado'?'ok':x.status==='erro'||x.status==='pulado_optout'?'bad':'gray'}">${D_ST[x.status]}</span>${x.enviado_em?` <span class="ps">${new Date(x.enviado_em).toLocaleString('pt-BR')}</span>`:''}${x.erro?`<div class="ps">${esc(x.erro)}</div>`:''}</div>`).join('')}`;$('drawer').classList.add('open')}
+async function txAprovar(id,n){if(!confirm(`Aprovar o envio para ${n} contatos pela Nutríssima?\n\nAs mensagens saem uma a uma, de 2 a 3 min entre elas, no máximo 30 por dia.`))return;
+ const {error}=await sb.from('transmissoes').update({status:'aprovada'}).eq('id',id);if(error)return alert('Erro: '+error.message);TX.loaded=false;await txLoad();txAbrir(id)}
+async function txSt(id,st){const {error}=await sb.from('transmissoes').update({status:st}).eq('id',id);if(error)return alert('Erro: '+error.message);TX.loaded=false;await txLoad();txAbrir(id)}
+
 sb.auth.onAuthStateChange((_e,s)=>show(s));sb.auth.getSession().then(({data})=>show(data.session));
-let shown=null;function show(s){const k=s?'app':'login';if(shown===k)return;shown=k;$('login').hidden=!!s;$('app').hidden=!s;if(s){$('who').textContent=s.user.email;load()}}
+let shown=null;function show(s){const k=s?'app':'login';if(shown===k)return;shown=k;$('login').hidden=!!s;$('app').hidden=!s;if(s){ME=s.user.email;$('who').textContent=s.user.email;load();const h=location.hash.slice(1);if(['at','tx'].includes(h))tab(h)}}
 </script></body></html>
