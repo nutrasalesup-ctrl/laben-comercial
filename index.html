@@ -362,6 +362,7 @@ tr.row.off .pn{font-weight:400}
 .oit td{padding:8px 6px;border-bottom:1px solid var(--line2);vertical-align:middle}
 .oit .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .oit input{width:64px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13.5px;text-align:right}
+.oit input.opm{width:92px}.oit input.opm.ed{border-color:var(--acc,#0071e3);background:#f3f8ff}
 .oit .x{border:0;background:none;color:var(--mut2);font-size:16px;cursor:pointer;padding:2px 6px;border-radius:6px}
 .oit .x:hover{background:var(--bad-bg);color:var(--bad)}
 .oit .pn{font-weight:500}.oit .ps{font-size:11.5px;color:var(--mut2)}
@@ -676,15 +677,15 @@ tr.row.off .pn{font-weight:400}
           <div id="oItens"></div>
         </div>
         <div class="ocard">
-          <h4>Condições <small>editáveis · <span class="ac">a confirmar</span> = sem regra cadastrada</small></h4>
+          <h4>Condições <small>padrão do estado · edite se precisar</small></h4>
           <div class="ofs c4">
-            <label class="of"><span>Pagamento <i id="oAc_pagamento"></i></span><input id="oPag" oninput="orcF('pagamento',this.value,1)"></label>
-            <label class="of"><span>Frete <i id="oAc_frete"></i></span><select id="oFrete" onchange="orcF('frete',this.value,1)"><option value="CIF">CIF (por nossa conta)</option><option value="FOB">FOB (por conta do cliente)</option><option value="A combinar">A combinar</option></select></label>
-            <label class="of"><span>Prazo de entrega <i id="oAc_prazo"></i></span><input id="oPrz" oninput="orcF('prazo',this.value,1)"></label>
-            <label class="of"><span>Validade <i id="oAc_validade"></i></span><input id="oVal" oninput="orcF('validade',this.value,1)"></label>
+            <label class="of"><span>Pagamento</span><input id="oPag" oninput="orcF('pagamento',this.value,1)"></label>
+            <label class="of"><span>Frete</span><select id="oFrete" onchange="orcF('frete',this.value,1)"><option value="CIF">CIF (por nossa conta)</option><option value="FOB">FOB (por conta do cliente)</option><option value="A combinar">A combinar</option></select></label>
+            <label class="of"><span>Prazo de entrega</span><input id="oPrz" oninput="orcF('prazo',this.value,1)"></label>
+            <label class="of"><span>Validade</span><input id="oVal" oninput="orcF('validade',this.value,1)"></label>
           </div>
           <div class="ofs c4" style="margin-top:10px">
-            <label class="of"><span>Desconto geral %</span><input id="oDg" inputmode="decimal" placeholder="0" onchange="orcDg(this.value)"></label>
+            <label class="of"><span>Desconto geral % (opcional)</span><input id="oDg" inputmode="decimal" placeholder="0" onchange="orcDg(this.value)"></label>
             <label class="of"><span>Faixa de preço</span><select id="oFx" onchange="orcFx(this.value)"></select></label>
             <label class="of w2" style="justify-content:flex-end"><span>&nbsp;</span><label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink)"><input type="checkbox" id="oCrm" style="width:auto" checked onchange="ORC.crm=this.checked;orcSave()"> Registrar no CRM e criar follow-up</label></label>
           </div>
@@ -2196,10 +2197,10 @@ function orcPersist(){localStorage.setItem(ORC_KEY,JSON.stringify(ORC))}
 function orcEst(){return EST.find(x=>x.uf===ORC.uf)||null}
 /* condições padrão do estado: só o que está cadastrado em Estados; o resto fica "a confirmar" */
 function orcDefaults(e){e=e||{};const mod=String(e.modalidade||'').toUpperCase();
-  return {pagamento:{v:e.prazo_pgto?`${e.prazo_pgto} dias`:'A combinar',ac:!e.prazo_pgto},
-    frete:{v:mod==='CIF'||mod==='FOB'?mod:'A combinar',ac:!(mod==='CIF'||mod==='FOB')},
-    prazo:{v:e.lead_time?`${e.lead_time} dias`:'A combinar',ac:!e.lead_time},
-    validade:{v:'7 dias',ac:true}}}
+  return {pagamento:{v:e.prazo_pgto?`${e.prazo_pgto} dias`:'A combinar',ac:false},
+    frete:{v:mod==='CIF'||mod==='FOB'?mod:'A combinar',ac:false},
+    prazo:{v:e.lead_time?`${e.lead_time} dias`:'A combinar',ac:false},
+    validade:{v:'7 dias',ac:false}}}
 function orcCond(){if(!ORC.cond||ORC.cond._uf!==ORC.uf){const d=orcDefaults(orcEst());const keep=ORC.cond||{};const c={_uf:ORC.uf};
     for(const k of ['pagamento','frete','prazo','validade'])c[k]=keep[k]&&keep[k].ed?keep[k]:d[k];ORC.cond=c}return ORC.cond}
 function orcNovo(){if(ORC&&ORC.itens.length&&!ORC.savedHash&&!confirm('Descartar o orçamento atual?'))return;ORC=orcBlank(ORC?ORC.uf:'SP');orcPersist();renderOrc();$('oCli').focus()}
@@ -2233,23 +2234,29 @@ function orcAdd(pid){const it=ORC.itens.find(x=>x.pid===pid);if(it)it.qtd=(Numbe
   const inp=document.querySelector(`#oItens input[data-pid="${pid}"][data-f="qtd"]`);if(inp){inp.focus();inp.select()}}
 function orcDel(pid){ORC.itens=ORC.itens.filter(x=>x.pid!==pid);orcPersist();renderOrc()}
 function orcEdit(el){const it=ORC.itens.find(x=>x.pid===el.dataset.pid);if(!it)return;let v=num(el.value);if(v==null||Number.isNaN(v)||v<0)v=0;
-  if(el.dataset.f==='qtd')it.qtd=Math.round(v*1000)/1000;else it.dp=Math.min(90,v);orcPersist();renderOrc()}
+  if(el.dataset.f==='qtd')it.qtd=Math.round(v*1000)/1000;else if(el.dataset.f==='pm')orcSetPm(it,el.value);else it.dp=Math.min(90,v);orcPersist();renderOrc()}
+/* preço digitado pela vendedora: vazio ou igual à tabela volta para a tabela */
+function orcTabOf(it){const p=PROD.find(x=>x.id===it.pid);if(!p)return null;const r=preRow(ORC.uf,p.id);return r?precoFaixa(r,orcFxAtual(),p):null}
+function orcSetPm(it,raw){const v=num(raw);const tab=orcTabOf(it);if(v==null||Number.isNaN(v)||v<=0||(tab!=null&&Math.abs(r2(v)-tab)<0.005)){it.pm=null;return}it.pm=r2(v)}
+function orcPm(el){const it=ORC.itens.find(x=>x.pid===el.dataset.pid);if(!it)return;orcSetPm(it,el.value);el.classList.toggle('ed',it.pm!=null);orcPersist();orcCalcRender()}
+function orcVt(x){if(x.tab==null)return 'sem preço de tabela';const t='tabela '+brlT(x.tab);if(x.pm==null)return t;const d=(x.pm-x.tab)/x.tab;return `${t} · <b class="${d<0?'c-warn':'c-ok'}">${d>0?'+':'−'}${pct(Math.abs(d))}</b>`}
 /* faixa: automática pelo valor do pedido (preço de tabela de cada faixa) */
 function orcSub(fx){let s=0;for(const it of ORC.itens){const p=PROD.find(x=>x.id===it.pid);const r=p&&preRow(ORC.uf,p.id);if(!r)continue;const t=precoFaixa(r,fx,p);if(t!=null)s+=t*(Number(it.qtd)||0)}return s}
 function orcFxAuto(){const list=faixasUf(ORC.uf);if(!list.length)return 1;for(const f of list.slice().reverse()){if(f.pedido_de==null||orcSub(f.ordem)>=Number(f.pedido_de))return f.ordem}return list[0].ordem}
 function orcFxAtual(){return ORC.fx==='auto'?orcFxAuto():Number(ORC.fx)||1}
-function orcCalc(){const e=orcEst();const fx=orcFxAtual();const dg=Number(ORC.dg)||0;const rows=[];let sub=0,tot=0,rec=0,mT=0,semM=0,sobC=0,un=0;const marcas=new Set();
+function orcCalc(){const e=orcEst();const fx=orcFxAtual();const dg=Number(ORC.dg)||0;const rows=[];let sub=0,tot=0,rec=0,mT=0,semM=0,sobC=0,un=0,tabT=0,totT=0;const marcas=new Set();
   for(const it of ORC.itens){const p=PROD.find(x=>x.id===it.pid);if(!p)continue;const r=preRow(ORC.uf,p.id)||{id:'tmp',uf:ORC.uf,produto_id:p.id};const q=Number(it.qtd)||0;
     const tab=precoFaixa(r,fx,p);marcas.add(marcaOf(p));
-    if(tab==null){rows.push({p,it,q,tab:null,pu:null,tot:null,c:null});sobC++;continue}
-    const pu=r2(tab*(1-(Number(it.dp)||0)/100)*(1-dg/100));const lt=r2(pu*q);
+    const pm=it.pm!=null&&Number(it.pm)>0?Number(it.pm):null;const base=pm!=null?pm:tab;
+    if(base==null){rows.push({p,it,q,tab:null,pm:null,base:null,pu:null,tot:null,c:null});sobC++;continue}
+    const pu=r2(base*(1-dg/100));const lt=r2(pu*q);
     const c=e?calc(p,r,e,fx,pu):null;
-    sub+=tab*q;tot+=lt;un+=q;if(c&&c.m!=null){rec+=pu*q;mT+=c.m*q}else if(q>0)semM++;
-    rows.push({p,it,q,tab,pu,tot:lt,c})}
+    sub+=base*q;tot+=lt;un+=q;if(tab!=null){tabT+=tab*q;totT+=lt}if(c&&c.m!=null){rec+=pu*q;mT+=c.m*q}else if(q>0)semM++;
+    rows.push({p,it,q,tab,pm,base,pu,tot:lt,c})}
   sub=r2(sub);tot=r2(tot);const desc=r2(sub-tot);
   const mp=rec?mT/rec:null;const ix=mp==null?null:Math.round(mp*100)/10;
   const list=faixasUf(ORC.uf);const f1=list[0];const fxRow=list.find(f=>f.ordem===fx);
-  return {e,fx,fxRow,rows,sub,tot,desc,descPct:sub?desc/sub:0,mT:r2(mT),mp,ix,semM,sobC,un,marcas,abaixoMin:f1&&f1.pedido_de!=null&&orcSub(f1.ordem)<Number(f1.pedido_de)?Number(f1.pedido_de):null}}
+  return {e,fx,fxRow,rows,sub,tot,desc,tabT:r2(tabT),vsTab:tabT?(totT-tabT)/tabT:null,difTab:r2(totT-tabT),descPct:sub?desc/sub:0,mT:r2(mT),mp,ix,semM,sobC,un,marcas,abaixoMin:f1&&f1.pedido_de!=null&&orcSub(f1.ordem)<Number(f1.pedido_de)?Number(f1.pedido_de):null}}
 function orcNome(p){return nice(p.descricao)}
 function orcTexto(C){C=C||orcCalc();const c=orcCond();const L=[];const cli=(ORC.cliente||'').trim()||'Cliente';
   const loc=[(ORC.cidade||'').trim(),ORC.uf].filter(Boolean).join('/');
@@ -2266,27 +2273,24 @@ function orcTexto(C){C=C||orcCalc();const c=orcCond();const L=[];const cli=(ORC.
   L.push('Posso confirmar o pedido?');
   return L.join('\n')}
 function orcIntHtml(C){const cls=C.ix==null?'c-mut':C.ix<0?'c-bad':C.ix<ORC_MIN?'c-bad':'c-ok';const al=[];
-  if(C.ix!=null&&C.ix<ORC_MIN)al.push(`<div class="oalert bad"><b>Índice ${idx(C.mp)} abaixo do mínimo ${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}.</b> Reduza o desconto ou ajuste o mix antes de enviar.</div>`);
+  if(C.ix!=null&&C.ix<ORC_MIN)al.push(`<div class="oalert bad"><b>Índice ${idx(C.mp)} abaixo do mínimo ${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}.</b> Suba o preço (ou reduza o desconto) antes de enviar.</div>`);
   else if(C.ix!=null)al.push(`<div class="oalert ok">Índice dentro do mínimo (${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}).</div>`);
   if(C.semM)al.push(`<div class="oalert warn">${C.semM} item(ns) sem CMV cadastrado: fora do cálculo da margem.</div>`);
   if(C.sobC)al.push(`<div class="oalert warn">${C.sobC} item(ns) sem preço na tabela: vão como "sob consulta" e ficam fora do total.</div>`);
   if(C.abaixoMin)al.push(`<div class="oalert warn">Pedido abaixo do mínimo da 1ª faixa (${brlT(C.abaixoMin)}).</div>`);
   if(C.marcas.has('Nutrissima'))al.push(`<div class="oalert warn">${ORC_NUT_AVISO}</div>`);
-  const ac=['pagamento','frete','prazo','validade'].filter(k=>orcCond()[k].ac);
-  if(ac.length)al.push(`<div class="oalert warn">A confirmar: ${ac.map(k=>({pagamento:'pagamento',frete:'frete',prazo:'prazo de entrega',validade:'validade'}[k])).join(', ')}. Edite o campo para confirmar.</div>`);
   return `<h4>Só para você <span class="olock">não vai para o cliente</span></h4>
    <div class="row2"><div><div class="kv">Índice de margem</div><div class="big ${cls}">${idx(C.mp)}</div></div>
-   <div class="kv">Margem <b>${C.ix==null?'—':brlT(C.mT)}</b><br>Desconto <b>${C.desc>0.004?brlT(C.desc)+' ('+pct(C.descPct)+')':'—'}</b><br>Faixa <b>${C.fxRow?esc(C.fxRow.nome):C.fx}</b>${ORC.fx==='auto'?' · auto':''}<br>Empresa <b>${esc(empNome())}</b> · ${esc(ORC.uf)}</div></div>${al.join('')}`}
+   <div class="kv">Margem <b>${C.ix==null?'—':brlT(C.mT)}</b><br>Vs. tabela <b>${C.vsTab==null||Math.abs(C.vsTab)<0.0005?'= tabela':(C.vsTab>0?'+':'−')+pct(Math.abs(C.vsTab))+' ('+brlT(Math.abs(C.difTab))+')'}</b>${C.desc>0.004?`<br>Desconto geral <b>${brlT(C.desc)} (${pct(C.descPct)})</b>`:''}<br>Faixa <b>${C.fxRow?esc(C.fxRow.nome):C.fx}</b>${ORC.fx==='auto'?' · auto':''}<br>Empresa <b>${esc(empNome())}</b> · ${esc(ORC.uf)}</div></div>${al.join('')}`}
 function orcCalcRender(){if(!$('oTxt')||!ORC)return;const C=orcCalc();
   /* atualiza só linhas, totais, painel interno e texto (sem redesenhar inputs em foco) */
   $('oInt').innerHTML=orcIntHtml(C);$('oTxt').textContent=orcTexto(C);
-  const c=orcCond();for(const k of ['pagamento','frete','prazo','validade']){const el=$('oAc_'+k);if(el)el.innerHTML=c[k].ac?'<span class="ac">a confirmar</span>':''}
   const has=C.rows.some(x=>x.q>0)&&(ORC.cliente||'').trim();$('oCopy').disabled=!has;
   const t=telDig(ORC.telefone);$('oWa').disabled=!has||!t;$('oWa').title=t?'Abre o WhatsApp com a mensagem pronta':'Informe o WhatsApp do cliente';
   const h=orcHash();$('oSaved').innerHTML=ORC.savedHash?(ORC.savedHash===h?`✓ Salvo em Orçamentos${ORC.contato_id?' e no CRM (follow-up criado)':''} · ${esc(ORC.savedAt||'')}`:'Alterado depois de salvo · será atualizado ao copiar de novo'):'Salvo automaticamente ao copiar ou abrir o WhatsApp.';
   const tf=$('oTot');if(tf)tf.innerHTML=orcTotHtml(C);
-  for(const x of C.rows){const tr=document.querySelector(`#oItens tr[data-pid="${x.p.id}"]`);if(!tr)continue;tr.querySelector('.pu').textContent=x.pu==null?'sob consulta':brlT(x.pu);tr.querySelector('.ltot').textContent=x.tot==null?'—':brlT(x.tot);const ix=tr.querySelector('.ix');if(ix)ix.innerHTML=orcPill(x.c)}}
-function orcTotHtml(C){return `<tr><td colspan="3" class="ps">${fmtIn(C.un)} un.${C.desc>0.004?' · subtotal '+brlT(C.sub)+' · desconto − '+brlT(C.desc):''}</td><td class="n hm"></td><td class="n"><b style="font-size:16px">${brlT(C.tot)}</b></td><td colspan="2"></td></tr>`}
+  for(const x of C.rows){const tr=document.querySelector(`#oItens tr[data-pid="${x.p.id}"]`);if(!tr)continue;const vt=tr.querySelector('.vt');if(vt)vt.innerHTML=orcVt(x);tr.querySelector('.ltot').textContent=x.tot==null?'—':brlT(x.tot);const ix=tr.querySelector('.ix');if(ix)ix.innerHTML=orcPill(x.c)}}
+function orcTotHtml(C){return `<tr><td colspan="3" class="ps">${fmtIn(C.un)} un.${C.desc>0.004?' · subtotal '+brlT(C.sub)+' · desconto − '+brlT(C.desc):''}</td><td class="n"><b style="font-size:16px">${brlT(C.tot)}</b></td><td colspan="2"></td></tr>`}
 function renderOrc(){if(!$('oItens'))return;if(!ORC)orcLoad();
   if(!EST.some(e=>e.uf===ORC.uf))ORC.uf=(EST.find(e=>e.uf==='SP')||EST[0]||{}).uf||'SP';
   $('oUf').innerHTML=EST.map(e=>`<option value="${e.uf}" ${e.uf===ORC.uf?'selected':''}>${e.uf}${e.tabela_ativa?'':' ·'}</option>`).join('');
@@ -2297,17 +2301,17 @@ function renderOrc(){if(!$('oItens'))return;if(!ORC)orcLoad();
   $('oFx').innerHTML=`<option value="auto">Automática (${esc((list.find(f=>f.ordem===fa)||{}).nome||'faixa '+fa)})</option>`+list.map(f=>`<option value="${f.ordem}" ${ORC.fx===f.ordem?'selected':''}>${esc(f.nome)}</option>`).join('');if(ORC.fx==='auto')$('oFx').value='auto';
   const C=orcCalc();
   $('oProdSub').textContent=C.rows.length?`${C.rows.length} ${C.rows.length>1?'itens':'item'} · preços da tabela ${ORC.uf}`:`preços da tabela ${ORC.uf}`;
-  $('oItens').innerHTML=C.rows.length?`<table class="oit"><thead><tr><th>Produto</th><th class="n">Qtd</th><th class="n">Desc. %</th><th class="n hm">Unit.</th><th class="n">Total</th><th class="n">Índice</th><th></th></tr></thead><tbody>${C.rows.map(x=>`<tr data-pid="${x.p.id}">
-      <td><div class="pn">${esc(orcNome(x.p))}</div><div class="ps">${esc(marcaNome(marcaOf(x.p)))} · ${esc(linhaOf(x.p))} · tabela ${x.tab==null?'sob consulta':brlT(x.tab)}</div></td>
+  $('oItens').innerHTML=C.rows.length?`<table class="oit"><thead><tr><th>Produto</th><th class="n">Qtd</th><th class="n">Preço un. R$</th><th class="n">Total</th><th class="n">Índice</th><th></th></tr></thead><tbody>${C.rows.map(x=>`<tr data-pid="${x.p.id}">
+      <td><div class="pn">${esc(orcNome(x.p))}</div><div class="ps">${esc(marcaNome(marcaOf(x.p)))} · ${esc(linhaOf(x.p))} · <span class="vt">${orcVt(x)}</span></div></td>
       <td class="n"><input inputmode="decimal" data-pid="${x.p.id}" data-f="qtd" value="${fmtIn(x.q)}" onchange="orcEdit(this)"></td>
-      <td class="n"><input inputmode="decimal" data-pid="${x.p.id}" data-f="dp" value="${x.it.dp?fmtIn(x.it.dp):''}" placeholder="0" onchange="orcEdit(this)" ${x.tab==null?'disabled':''}></td>
-      <td class="n hm pu"></td><td class="n ltot"></td><td class="n ix"></td>
+      <td class="n"><input class="opm${x.pm!=null?' ed':''}" inputmode="decimal" data-pid="${x.p.id}" data-f="pm" value="${x.base==null?'':x.base.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}" placeholder="${x.tab==null?'digite':''}" oninput="orcPm(this)" onchange="orcEdit(this)" onfocus="this.select()"></td>
+      <td class="n ltot"></td><td class="n ix"></td>
       <td class="n"><button class="x" type="button" title="Remover" onclick="orcDel('${x.p.id}')">✕</button></td></tr>`).join('')}</tbody><tfoot id="oTot"></tfoot></table>`:'<div class="oempty">Busque acima e toque no produto para adicionar.<br>Enter adiciona o primeiro da lista.</div>';
   orcCliInfo();orcCalcRender();if(!ORC_CLI.length)orcLoadCli();if(ORC_HIST==null)orcHist()}
 function orcHash(){const C=orcCalc();return JSON.stringify([ORC.cliente,ORC.cidade,ORC.uf,ORC.telefone,ORC.dg,C.fx,C.rows.map(x=>[x.p.id,x.q,x.it.dp,x.pu]),orcCond()])}
 function bizDays(n){const d=new Date();let k=0;while(k<n){d.setDate(d.getDate()+1);const w=d.getDay();if(w&&w<6)k++}return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 async function orcSave(txt){const C=orcCalc();const c=orcCond();const h=orcHash();if(ORC.savedHash===h&&ORC.id)return true;
-  const itens=C.rows.filter(x=>x.q>0).map(x=>({produto_id:x.p.id,codigo:x.p.codigo||null,produto:orcNome(x.p),marca:marcaOf(x.p),embalagem:x.p.embalagem||embName(embOf(x.p)),qtd:x.q,preco_tabela:x.tab==null?null:r2(x.tab),desconto_pct:Number(x.it.dp)||0,preco_unit:x.pu,total:x.tot,sob_consulta:x.pu==null,indice:x.c&&x.c.mp!=null?Math.round(x.c.mp*100)/10:null}));
+  const itens=C.rows.filter(x=>x.q>0).map(x=>({produto_id:x.p.id,codigo:x.p.codigo||null,produto:orcNome(x.p),marca:marcaOf(x.p),embalagem:x.p.embalagem||embName(embOf(x.p)),qtd:x.q,preco_tabela:x.tab==null?null:r2(x.tab),desconto_pct:0,preco_digitado:x.pm,preco_unit:x.pu,total:x.tot,sob_consulta:x.pu==null,indice:x.c&&x.c.mp!=null?Math.round(x.c.mp*100)/10:null}));
   const now=new Date().toISOString();
   /* CRM */
   if(ORC.crm!==false){
@@ -2317,7 +2321,7 @@ async function orcSave(txt){const C=orcCalc();const c=orcCond();const h=orcHash(
         if(error){toast('CRM: '+error.message,1)}else{ORC.cliente_id=data.id;ORC_CLI.push(data);if(REL.crm)REL.crm.loaded=false}}}
   }
   const row={updated_at:now,cliente_id:ORC.cliente_id||null,cliente_nome:ORC.cliente.trim(),cidade:(ORC.cidade||'').trim()||null,uf:ORC.uf,telefone:(ORC.telefone||'').trim()||null,empresa:EMP,itens,subtotal:C.sub,desconto_pct:Math.round(C.descPct*10000)/100,desconto_valor:C.desc,total:C.tot,margem_indice:C.ix,margem_rs:C.ix==null?null:C.mT,faixa:C.fx,
-    pagamento:c.pagamento.v,frete:c.frete.v,prazo_entrega:c.prazo.v,validade:c.validade.v,a_confirmar:['pagamento','frete','prazo','validade'].filter(k=>c[k].ac),texto_whatsapp:txt,status:'enviado'};
+    pagamento:c.pagamento.v,frete:c.frete.v,prazo_entrega:c.prazo.v,validade:c.validade.v,a_confirmar:[],texto_whatsapp:txt,status:'enviado'};
   const q=ORC.id?sb.from('orcamentos').update(row).eq('id',ORC.id).select().single():sb.from('orcamentos').insert(row).select().single();
   const {data,error}=await q;if(error){toast('Erro ao salvar orçamento: '+error.message,1);return false}
   ORC.id=data.id;
@@ -2339,8 +2343,8 @@ function orcHistRender(){const box=$('oHist');if(!box)return;if(!ORC_HIST.length
 async function orcSt(id,st){const {error}=await sb.from('orcamentos').update({status:st,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast('Erro: '+error.message,1);return}const o=ORC_HIST.find(x=>x.id===id);if(o)o.status=st;toast('Status: '+st)}
 async function orcOpen(id){const {data:o,error}=await sb.from('orcamentos').select('*').eq('id',id).single();if(error){toast('Erro: '+error.message,1);return}
   const n=orcBlank(o.uf);Object.assign(n,{id:o.id,cliente_id:o.cliente_id,cliente:o.cliente_nome||'',cidade:o.cidade||'',telefone:o.telefone||'',contato_id:o.contato_id,fx:o.faixa||'auto',
-    itens:(o.itens||[]).filter(i=>PROD.some(p=>p.id===i.produto_id)).map(i=>({pid:i.produto_id,qtd:Number(i.qtd)||0,dp:Number(i.desconto_pct)||0}))});
-  const ac=o.a_confirmar||[];n.cond={_uf:o.uf,pagamento:{v:o.pagamento||'A combinar',ac:ac.includes('pagamento'),ed:true},frete:{v:o.frete||'A combinar',ac:ac.includes('frete'),ed:true},prazo:{v:o.prazo_entrega||'A combinar',ac:ac.includes('prazo'),ed:true},validade:{v:o.validade||'7 dias',ac:ac.includes('validade'),ed:true}};
+    itens:(o.itens||[]).filter(i=>PROD.some(p=>p.id===i.produto_id)).map(i=>({pid:i.produto_id,qtd:Number(i.qtd)||0,dp:Number(i.desconto_pct)||0,pm:i.preco_digitado!=null?Number(i.preco_digitado):null}))});
+  const ac=[];n.cond={_uf:o.uf,pagamento:{v:o.pagamento||'A combinar',ac:ac.includes('pagamento'),ed:true},frete:{v:o.frete||'A combinar',ac:ac.includes('frete'),ed:true},prazo:{v:o.prazo_entrega||'A combinar',ac:ac.includes('prazo'),ed:true},validade:{v:o.validade||'7 dias',ac:ac.includes('validade'),ed:true}};
   ORC=n;ORC.savedHash=orcHash();ORC.savedAt=dataBR(o.updated_at);orcPersist();renderOrc();window.scrollTo(0,0);toast('Orçamento carregado')}
 document.addEventListener('click',ev=>{const b=$('oRes');if(b&&!ev.target.closest('.oadd'))b.classList.remove('on')});
 
