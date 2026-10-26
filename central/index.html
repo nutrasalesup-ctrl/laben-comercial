@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Central de Sinapses · ao vivo</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--tx:#1d1d1f;--t2:#6e6e73;--ln:#d2d2d7;--ac:#0071e3;--ok:#248a3d;--wa:#b25000;--bad:#d70015}
+@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--tx:#f5f5f7;--t2:#a1a1a6;--ln:#38383a;--ac:#2997ff;--ok:#30d158;--wa:#ff9f0a;--bad:#ff453a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--ln);padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+h1{font-size:19px;margin:0 12px 0 0;font-weight:600}
+.seg{display:inline-flex;background:var(--ln);border-radius:9px;padding:2px}.seg button{border:0;background:none;color:var(--tx);padding:6px 14px;border-radius:7px;font:inherit;cursor:pointer}
+.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
+.sp{flex:1}.stamp{color:var(--t2);font-size:13px}
+.btn{border:0;background:var(--ac);color:#fff;border-radius:980px;padding:7px 16px;font:inherit;font-size:14px;cursor:pointer}.btn.q{background:var(--ln);color:var(--tx)}
+main{max-width:1240px;margin:0 auto;padding:20px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.card{background:var(--card);border-radius:18px;padding:16px 18px;border:1px solid var(--ln)}
+.k{color:var(--t2);font-size:13px}.v{font-size:28px;font-weight:600;letter-spacing:-.02em}.s{color:var(--t2);font-size:12px}
+h2{font-size:17px;margin:26px 0 10px;font-weight:600}
+.garg{border-color:var(--bad)}.garg .v{color:var(--bad);font-size:20px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;border-bottom:1px solid var(--ln);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--t2);font-weight:500}
+.bar{height:8px;border-radius:4px;background:var(--ac);opacity:.85}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.chip{border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:980px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer}.chip.on{background:var(--tx);color:var(--bg)}
+.st-ok{color:var(--ok)}.st-wa{color:var(--wa)}.st-bad{color:var(--bad)}
+#msg{padding:40px;text-align:center;color:var(--t2)}
+/* fluxo */
+#fluxoWrap{position:relative;height:calc(100vh - 70px);overflow:hidden}
+#tools{position:absolute;right:16px;top:12px;z-index:3;display:flex;gap:6px}
+#canvasF{transform-origin:0 0;position:absolute;left:0;top:0;padding:30px}
+.node{width:250px;background:var(--card);border:1px solid var(--ln);border-radius:18px;padding:14px 16px;cursor:pointer;font-size:17px}
+.node b{display:block;font-size:18px}.node .s{font-size:14px}
+.node:hover{border-color:var(--ac)}
+.row{display:flex;gap:26px;align-items:flex-start;flex-wrap:nowrap}
+.arrow{align-self:center;color:var(--t2);font-size:26px}
+.subs{display:flex;gap:10px;margin-top:12px}.sub{width:150px;background:var(--card);border:1px dashed var(--ln);border-radius:14px;padding:10px;font-size:14px;cursor:pointer}
+.side{position:fixed;right:0;top:0;bottom:0;width:min(420px,100%);background:var(--card);border-left:1px solid var(--ln);z-index:10;padding:20px;overflow:auto;transform:translateX(100%);transition:transform .2s}.side.on{transform:none}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+</style></head><body>
+<header><h1>Central de Sinapses</h1>
+<div class="seg"><button id="tGeral" class="on">Visão geral</button><button id="tFluxo">Fluxo</button></div>
+<span class="sp"></span><span class="stamp" id="stamp">Carregando…</span><button class="btn" id="refresh">Atualizar</button></header>
+<div id="msg">Lendo o banco…</div>
+<main id="geral" hidden></main>
+<div id="fluxoWrap" hidden><div id="tools"><button class="btn q" id="zin">+</button><button class="btn q" id="zout">−</button><button class="btn q" id="zfit">Ajustar à tela</button></div><div id="canvasF"></div></div>
+<aside class="side" id="side"></aside>
+<script>
+const URL_API="https://cjwurpumthjumtgjjolt.supabase.co/rest/v1/", KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqd3VycHVtdGhqdW10Z2pqb2x0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjA2NDAsImV4cCI6MjEwNjc5NjY0MH0.AbauM8x-7czvoHMmatG0MwC_qEsxrrt49uy1wKhsfno";
+const DIV={foodservice:"Laben Food Service",industria:"Laben Indústria",natural:"Nutríssima Natural",distribuicao:"Distribuição",varejo:"Varejo",a_classificar:"A classificar",todas:"Todas"};
+const FASE={prospectados:"Prospectados",contatados:"Contatados",responderam:"Responderam",interessados:"Interessados",amostra_enviada:"Amostra enviada",amostra_entregue:"Amostra entregue",feedback:"Feedback",pedido_cliente:"Pedido / cliente"};
+let D=null, divSel="todas", zoom=1;
+const $=s=>document.querySelector(s), esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const hm=t=>t?new Date(t).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).replace(","," ·"):"sem registro";
+async function get(v){const r=await fetch(URL_API+v+"?select=*",{headers:{apikey:KEY,Authorization:"Bearer "+KEY,"Accept-Profile":"central_publico"}});if(!r.ok)throw new Error(v+": HTTP "+r.status);return r.json()}
+async function load(){$("#stamp").textContent="Carregando…";
+ try{const [resumo,funil,amostras,sdr,agentes,conexoes]=await Promise.all(["resumo","funil","amostras_status","sdr_divisoes","agentes","conexoes"].map(get));
+  D={resumo:resumo[0],funil,amostras,sdr:sdr.sort((a,b)=>a.ordem-b.ordem),agentes,conexoes};
+  const t=new Date(D.resumo.lido_em).toLocaleTimeString("pt-BR",{timeZone:"America/Sao_Paulo",hour:"2-digit",minute:"2-digit"}).replace(":","h");
+  $("#stamp").textContent="Lido do banco às "+t+" (BRT)";$("#msg").hidden=true;render();
+ }catch(e){$("#stamp").textContent="Erro ao ler o banco";$("#msg").hidden=false;$("#msg").textContent="Não foi possível ler os dados ("+e.message+"). Tente Atualizar.";}}
+function gargalo(div){const f=D.funil.filter(x=>x.divisao===div&&x.atrasados>0).sort((a,b)=>b.atrasados-a.atrasados||b.ordem-a.ordem)[0];return f}
+function estadoCls(s){s=String(s||"");return /open|ativo|enviado|aprovado/.test(s)?"st-ok":/erro|close|fora|sem inst/.test(s)?"st-bad":"st-wa"}
+function render(){renderGeral();renderFluxo()}
+function renderGeral(){const r=D.resumo,g=gargalo("todas");
+ const divs=["todas",...new Set(D.funil.map(x=>x.divisao).filter(x=>x!=="todas"))];
+ const fl=D.funil.filter(x=>x.divisao===divSel).sort((a,b)=>a.ordem-b.ordem), max=Math.max(1,...fl.map(x=>x.acumulado));
+ let h=`<div class="grid">
+ <div class="card"><div class="k">Pedidos no mês</div><div class="v">${r.pedidos_mes}</div><div class="s">meta a definir · R$ não exibido na página pública</div></div>
+ <div class="card"><div class="k">Leads no CRM</div><div class="v">${r.leads}</div><div class="s">${r.contatados} contatados · ${r.responderam} responderam</div></div>
+ <div class="card"><div class="k">Hoje</div><div class="v">${r.envios_hoje} <span class="s">envios</span></div><div class="s">${r.respostas_hoje} respostas</div></div>
+ <div class="card"><div class="k">Tarefas até hoje</div><div class="v">${r.tarefas_ate_hoje}</div><div class="s">${r.tarefas_vencidas} vencidas · ${r.followups_vencidos} follow-ups vencidos</div></div>
+ <div class="card"><div class="k">1º contato → pedido</div><div class="v">${r.dias_contato_pedido??"—"}</div><div class="s">${r.dias_contato_pedido==null?"sem registro (nenhum pedido)":"dias em média"}</div></div>
+ <div class="card garg"><div class="k">Gargalo nº 1</div><div class="v">${g?FASE[g.fase]:"nenhum"}</div><div class="s">${g?g.atrasados+" empresas além do prazo":""}</div></div></div>
+ <h2>Funil por fase</h2><div class="filters">${divs.map(d=>`<button class="chip ${d===divSel?"on":""}" data-d="${d}">${DIV[d]||d}</button>`).join("")}</div>
+ <div class="card"><table><tr><th>Fase</th><th></th><th>Acumulado</th><th>Conversão</th><th>Na fase</th><th>Parado (dias)</th><th>Além do prazo</th></tr>`;
+ fl.forEach((x,i)=>{const prev=i?fl[i-1].acumulado:null;h+=`<tr><td>${FASE[x.fase]}</td><td style="width:28%"><div class="bar" style="width:${100*x.acumulado/max}%"></div></td><td>${x.acumulado}</td><td>${prev?Math.round(100*x.acumulado/prev)+"%":"—"}</td><td>${x.na_fase}</td><td>${x.dias_parado_medio??"—"}</td><td class="${x.atrasados?"st-bad":""}">${x.atrasados}</td></tr>`});
+ h+=`</table></div><h2>Mapa por divisão</h2><div class="grid">`;
+ D.sdr.forEach(s=>{const p=k=>(D.funil.find(x=>x.divisao===s.divisao&&x.fase===k)||{}).acumulado??0;const gd=gargalo(s.divisao);
+  h+=`<div class="card"><div class="k">${DIV[s.divisao]} · ${s.numero_mascarado}</div><div class="v">${s.leads}</div><div class="s">${p("contatados")} contatados · ${p("responderam")} responderam · ${p("interessados")} interessados · ${p("amostra_enviada")} amostras · ${p("pedido_cliente")} pedidos</div><div class="s">Fila de novos: ${s.fila_novos} · Lote: <span class="${estadoCls(s.lote_status)}">${s.lote_status}</span></div>${gd?`<div class="s st-bad">Gargalo: ${FASE[gd.fase]} (${gd.atrasados})</div>`:""}</div>`});
+ h+=`</div><h2>Amostras por status</h2><div class="card"><table><tr><th>Status</th><th>Divisão</th><th>Qtd.</th></tr>${D.amostras.sort((a,b)=>b.n-a.n).map(a=>`<tr><td>${esc(a.etapa)}</td><td>${DIV[a.divisao]||esc(a.divisao)}</td><td>${a.n}</td></tr>`).join("")}</table></div>
+ <h2>Números de WhatsApp</h2><div class="grid">${D.conexoes.map(c=>`<div class="card"><div class="k">${esc(c.instancia)}</div><div class="v">${esc(c.numero_mascarado)}</div><div class="s"><span class="${estadoCls(c.estado)}">${esc(c.estado)}</span> · verificado ${hm(c.verificado_em)}</div></div>`).join("")}</div>`;
+ $("#geral").innerHTML=h;document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{divSel=b.dataset.d;renderGeral()})}
+const ORDEM=[["pesquisa_leads"],["sdr"],["atendimento"],["talita"],["adm_vendas"],["amostras"],["sucesso_cliente"],["farmer"]];
+function ag(id){return D.agentes.find(a=>a.agente_id===id)||{agente_id:id,nome:id,estado:"sem registro"}}
+function nodeHtml(id){const a=ag(id);return `<div class="node" data-a="${id}"><b>${esc(a.nome)}</b><div class="s"><span class="dot" style="background:currentColor" class="${estadoCls(a.estado)}"></span><span class="${estadoCls(a.estado)}">${esc(a.estado)}</span> · ${hm(a.ultima_execucao)}</div></div>`}
+function renderFluxo(){let h=`<div class="row">`;ORDEM.forEach(([id],i)=>{h+=(i?`<span class="arrow">→</span>`:"")+`<div>${nodeHtml(id)}${id==="sdr"?`<div class="subs">${D.sdr.map(s=>`<div class="sub" data-s="${s.divisao}"><b>${DIV[s.divisao]}</b><br>${s.numero_mascarado}<br>${s.env_hoje} enviados · ${s.resp_hoje} respostas<br><span class="${estadoCls(s.lote_status)}">${s.lote_status}</span></div>`).join("")}</div>`:""}</div>`});
+ h+=`</div><div class="row" style="margin-top:40px">${["coordenador","marketing","prospeccao_b2b"].map(nodeHtml).join("")}</div>`;
+ $("#canvasF").innerHTML=h;applyZoom();
+ document.querySelectorAll(".node").forEach(n=>n.onclick=()=>painelAgente(n.dataset.a));document.querySelectorAll(".sub").forEach(n=>n.onclick=()=>painelSub(n.dataset.s))}
+function abrir(h){$("#side").innerHTML=`<button class="btn q" onclick="document.getElementById('side').classList.remove('on')" style="float:right">Fechar</button>`+h;$("#side").classList.add("on")}
+function painelAgente(id){const a=ag(id);let h=`<h2>${esc(a.nome)}</h2><table><tr><td>Estado</td><td class="${estadoCls(a.estado)}">${esc(a.estado)}</td></tr><tr><td>Última execução</td><td>${hm(a.ultima_execucao)}</td></tr><tr><td>Próxima execução</td><td>${hm(a.proxima_execucao)}</td></tr></table>`;
+ if(id==="sdr"||id==="atendimento"){h+=`<h2>Por divisão</h2><table><tr><th>Divisão</th><th>${id==="sdr"?"Envios hoje":"Respostas hoje"}</th><th>${id==="sdr"?"Fila":"Pendentes"}</th></tr>${D.sdr.map(s=>`<tr><td>${DIV[s.divisao]}</td><td>${id==="sdr"?s.env_hoje:s.resp_hoje}</td><td>${id==="sdr"?s.fila_novos:s.pendentes_atend}</td></tr>`).join("")}</table>`}
+ if(id==="amostras"){h+=`<h2>Amostras</h2><table>${D.amostras.map(x=>`<tr><td>${esc(x.etapa)}</td><td>${x.n}</td></tr>`).join("")}</table>`}
+ if(id==="talita"){h+=`<p>Leads com a Talita: ${D.resumo.com_talita}</p>`}
+ abrir(h)}
+function painelSub(d){const s=D.sdr.find(x=>x.divisao===d);abrir(`<h2>${DIV[d]}</h2><table><tr><td>Número de saída</td><td>${s.numero_mascarado}</td></tr><tr><td>Enviados hoje</td><td>${s.env_hoje}</td></tr><tr><td>Uso do limite do número</td><td>${s.env_hoje_numero} de ${s.limite_dia}</td></tr><tr><td>Respostas hoje</td><td>${s.resp_hoje}</td></tr><tr><td>Status do lote</td><td class="${estadoCls(s.lote_status)}">${s.lote_status}</td></tr><tr><td>Fila de novos</td><td>${s.fila_novos}</td></tr><tr><td>Follow-ups vencidos</td><td>${s.fu_vencidos}</td></tr><tr><td>Último envio</td><td>${hm(s.ultimo_envio)}</td></tr><tr><td>Total enviado</td><td>${s.env_total}</td></tr></table>`)}
+function applyZoom(){$("#canvasF").style.transform=`scale(${zoom})`}
+function fit(){const c=$("#canvasF"),w=$("#fluxoWrap");zoom=Math.min(1.4,(w.clientWidth-20)/c.scrollWidth,(w.clientHeight-20)/c.scrollHeight);applyZoom()}
+$("#zin").onclick=()=>{zoom*=1.15;applyZoom()};$("#zout").onclick=()=>{zoom/=1.15;applyZoom()};$("#zfit").onclick=fit;
+$("#tGeral").onclick=()=>{$("#tGeral").classList.add("on");$("#tFluxo").classList.remove("on");$("#geral").hidden=false;$("#fluxoWrap").hidden=true};
+$("#tFluxo").onclick=()=>{$("#tFluxo").classList.add("on");$("#tGeral").classList.remove("on");$("#geral").hidden=true;$("#fluxoWrap").hidden=false;fit()};
+$("#refresh").onclick=load;$("#geral").hidden=false;load();
+</script></body></html>
