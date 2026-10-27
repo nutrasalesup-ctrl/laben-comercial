@@ -32,16 +32,20 @@ td input[type=checkbox]{width:18px;height:18px}
 .srch input:focus{background:#fff;box-shadow:0 0 0 3px rgba(0,113,227,.25)}
 .srch .qx{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:20px;height:20px;padding:0;border-radius:50%;background:#aeaeb2;color:#fff;font-size:14px;line-height:20px;text-align:center}
 .qn{align-self:center;color:var(--mu);font-size:13px}
+.topbusca{position:sticky;top:61px;z-index:4;background:var(--bg);padding:18px 0 6px}
+.srch.top{flex:none;max-width:640px}.srch.top input{font-size:16px;padding:13px 40px 13px 40px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06)}.srch.top svg{left:14px}
+.srch.top input:focus{box-shadow:0 0 0 3px rgba(0,113,227,.25)}.srch.top .qx{right:10px}
 </style></head><body>
 <div id="login" hidden><h1 style="font-size:32px">Funil B2B</h1><p class="mu">Entre com seu e-mail para receber o link de acesso.</p>
 <input id="em" type="email" placeholder="voce@empresa.com.br"><button onclick="sendLink()">Enviar link</button><p id="lmsg" class="mu"></p></div>
 <div id="app" hidden>
 <header><h1>Painel B2B · Nutríssima / LBR</h1><nav class="tabs"><button data-t="funil" class="on" onclick="tab(this.dataset.t)">Funil</button><button data-t="at" onclick="tab(this.dataset.t)">Atendimentos</button><button data-t="tx" onclick="tab(this.dataset.t)">Lista de transmissão</button></nav><div><span id="who" class="mu"></span> <button class="sec" onclick="sb.auth.signOut().then(()=>location.reload())">Sair</button></div></header>
 <main id="v-funil">
-<h2>Funil</h2><div class="cards" id="cards"></div>
+<div class="topbusca"><div class="srch top"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar cliente: nome, cidade, UF, telefone ou CNPJ" autocomplete="off" oninput="renderEmp();busca()" onkeydown="if(event.key==='Escape'){this.value='';renderEmp();busca()}"><button type="button" id="qx" class="qx" hidden aria-label="Limpar busca" onclick="$('q').value='';renderEmp();busca();$('q').focus()">×</button></div></div>
+<div id="semBusca"><h2>Funil</h2><div class="cards" id="cards"></div>
 <h2>Tarefas de hoje</h2><div class="panel"><table><thead><tr><th>Empresa</th><th>Etapa</th><th>Próximo passo</th><th>Data</th><th>Responsável</th></tr></thead><tbody id="tasks"></tbody></table></div>
-<h2>Empresas</h2>
-<div class="bar"><div class="srch"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar cliente: nome, cidade, UF, telefone ou CNPJ" autocomplete="off" oninput="renderEmp()" onkeydown="if(event.key==='Escape'){this.value='';renderEmp()}"><button type="button" id="qx" class="qx" hidden aria-label="Limpar busca" onclick="$('q').value='';renderEmp();$('q').focus()">×</button></div><select id="fs" onchange="renderEmp()"><option value="">Todos os segmentos</option></select>
+</div><h2 id="hEmp">Empresas</h2>
+<div class="bar"><select id="fs" onchange="renderEmp()"><option value="">Todos os segmentos</option></select>
 <select id="fp" onchange="renderEmp()"><option value="">Toda prioridade</option><option>A</option><option>B</option><option>C</option></select><span id="qn" class="qn"></span></div>
 <div class="panel"><table><thead><tr><th>Empresa</th><th>Segmento</th><th>Cidade</th><th>Prioridade</th><th>Etapa</th><th>WhatsApp</th></tr></thead><tbody id="emps"></tbody></table></div>
 </main>
@@ -68,6 +72,7 @@ async function load(){
 const fold=v=>(v??'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const EMP_CAMPOS=['nome','razao_social','nome_fantasia','cidade','uf','segmento','whatsapp','telefone','email','cnpj','documento','instagram','site'];
 function empTxt(x){const t=EMP_CAMPOS.map(k=>x[k]).filter(Boolean).join(' ');return fold(t)+' '+t.replace(/\D/g,'')}
+function busca(){const on=!!$('q').value.trim();$('semBusca').hidden=on;$('hEmp').textContent=on?'Resultado da busca':'Empresas'}
 function renderEmp(){const raw=$('q').value.trim(),s=$('fs').value,p=$('fp').value;$('qx').hidden=!raw;
  const ws=fold(raw).split(/\s+/).filter(Boolean);
  const l=EMP.filter(x=>{if(s&&x.segmento!==s)return false;if(p&&x.prioridade!==p)return false;if(!ws.length)return true;const t=empTxt(x);return ws.every(w=>t.includes(w)||(/^[\d().\/\s+-]+$/.test(w)&&w.replace(/\D/g,'').length>=3&&t.includes(w.replace(/\D/g,''))))});
