@@ -27,6 +27,11 @@ label{display:block;font-size:12px;color:var(--mu)}label input,label select,labe
 .bub{max-width:80%;padding:8px 12px;border-radius:14px;font-size:14px;background:#f0f0f3;white-space:pre-wrap}.bub.nos{background:#e8f0fe}
 .prev{white-space:pre-wrap;background:#f5f5f7;border-radius:14px;padding:12px 14px;font-size:14px}button.danger{background:#e8e8ed;color:#c9271c}
 td input[type=checkbox]{width:18px;height:18px}
+.srch{position:relative;flex:0 1 380px;min-width:220px}.srch svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none}
+.srch input{width:100%;border:0;background:#e8e8ed;border-radius:10px;padding:9px 34px 9px 34px;outline:none;-webkit-appearance:none;appearance:none}.srch input::-webkit-search-cancel-button{display:none}
+.srch input:focus{background:#fff;box-shadow:0 0 0 3px rgba(0,113,227,.25)}
+.srch .qx{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:20px;height:20px;padding:0;border-radius:50%;background:#aeaeb2;color:#fff;font-size:14px;line-height:20px;text-align:center}
+.qn{align-self:center;color:var(--mu);font-size:13px}
 </style></head><body>
 <div id="login" hidden><h1 style="font-size:32px">Funil B2B</h1><p class="mu">Entre com seu e-mail para receber o link de acesso.</p>
 <input id="em" type="email" placeholder="voce@empresa.com.br"><button onclick="sendLink()">Enviar link</button><p id="lmsg" class="mu"></p></div>
@@ -36,8 +41,8 @@ td input[type=checkbox]{width:18px;height:18px}
 <h2>Funil</h2><div class="cards" id="cards"></div>
 <h2>Tarefas de hoje</h2><div class="panel"><table><thead><tr><th>Empresa</th><th>Etapa</th><th>Próximo passo</th><th>Data</th><th>Responsável</th></tr></thead><tbody id="tasks"></tbody></table></div>
 <h2>Empresas</h2>
-<div class="bar"><input id="q" placeholder="Buscar nome ou cidade" oninput="renderEmp()"><select id="fs" onchange="renderEmp()"><option value="">Todos os segmentos</option></select>
-<select id="fp" onchange="renderEmp()"><option value="">Toda prioridade</option><option>A</option><option>B</option><option>C</option></select></div>
+<div class="bar"><div class="srch"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar cliente: nome, cidade, UF, telefone ou CNPJ" autocomplete="off" oninput="renderEmp()" onkeydown="if(event.key==='Escape'){this.value='';renderEmp()}"><button type="button" id="qx" class="qx" hidden aria-label="Limpar busca" onclick="$('q').value='';renderEmp();$('q').focus()">×</button></div><select id="fs" onchange="renderEmp()"><option value="">Todos os segmentos</option></select>
+<select id="fp" onchange="renderEmp()"><option value="">Toda prioridade</option><option>A</option><option>B</option><option>C</option></select><span id="qn" class="qn"></span></div>
 <div class="panel"><table><thead><tr><th>Empresa</th><th>Segmento</th><th>Cidade</th><th>Prioridade</th><th>Etapa</th><th>WhatsApp</th></tr></thead><tbody id="emps"></tbody></table></div>
 </main>
 <main id="v-at" hidden><h2>Atendimentos</h2><p class="mu" style="margin-top:-6px">WhatsApp (B2B Laben, Nutríssima, Site) e chats dos marketplaces. Quem espera resposta nossa há mais tempo aparece primeiro.</p><div id="rel-at"></div></main>
@@ -60,9 +65,14 @@ async function load(){
  EMP=e.data;FUN={};f.data.forEach(x=>FUN[x.empresa_id]=x);
  const segs=[...new Set(EMP.map(x=>x.segmento).filter(Boolean))].sort(),cur=$('fs').value;
  $('fs').innerHTML='<option value="">Todos os segmentos</option>'+segs.map(s=>`<option>${esc(s)}</option>`).join('');$('fs').value=cur;renderEmp()}
-function renderEmp(){const q=$('q').value.toLowerCase(),s=$('fs').value,p=$('fp').value;
- const l=EMP.filter(x=>(!s||x.segmento===s)&&(!p||x.prioridade===p)&&(!q||(x.nome+' '+(x.cidade||'')).toLowerCase().includes(q)));
- $('emps').innerHTML=l.map(x=>`<tr onclick="openEmp(${x.id})"><td><b>${esc(x.nome)}</b></td><td>${esc(x.segmento)}</td><td>${esc(x.cidade)}</td><td>${esc(x.prioridade)}</td><td><span class="pill">${FUN[x.id]?.etapa||'—'}</span></td><td>${esc(x.whatsapp)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">Nada encontrado.</td></tr>'}
+const fold=v=>(v??'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const EMP_CAMPOS=['nome','razao_social','nome_fantasia','cidade','uf','segmento','whatsapp','telefone','email','cnpj','documento','instagram','site'];
+function empTxt(x){const t=EMP_CAMPOS.map(k=>x[k]).filter(Boolean).join(' ');return fold(t)+' '+t.replace(/\D/g,'')}
+function renderEmp(){const raw=$('q').value.trim(),s=$('fs').value,p=$('fp').value;$('qx').hidden=!raw;
+ const ws=fold(raw).split(/\s+/).filter(Boolean);
+ const l=EMP.filter(x=>{if(s&&x.segmento!==s)return false;if(p&&x.prioridade!==p)return false;if(!ws.length)return true;const t=empTxt(x);return ws.every(w=>t.includes(w)||(/^[\d().\/\s+-]+$/.test(w)&&w.replace(/\D/g,'').length>=3&&t.includes(w.replace(/\D/g,''))))});
+ $('qn').textContent=(raw||s||p)?`${l.length} de ${EMP.length} clientes`:`${EMP.length} clientes`;
+ $('emps').innerHTML=l.map(x=>`<tr onclick="openEmp(${x.id})"><td><b>${esc(x.nome)}</b></td><td>${esc(x.segmento)}</td><td>${esc(x.cidade)}</td><td>${esc(x.prioridade)}</td><td><span class="pill">${FUN[x.id]?.etapa||'—'}</span></td><td>${esc(x.whatsapp)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">Nenhum cliente encontrado. Ajuste a busca ou os filtros.</td></tr>'}
 async function openEmp(id){const e=EMP.find(x=>x.id===id),f=FUN[id]||{};
  const [c,i]=await Promise.all([sb.from('contatos').select('*').eq('empresa_id',id),sb.from('interacoes').select('*').eq('empresa_id',id).order('data',{ascending:false})]);
  $('drawer').innerHTML=`<div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(e.nome)}</h2><button class="sec" onclick="$('drawer').classList.remove('open')">Fechar</button></div>
