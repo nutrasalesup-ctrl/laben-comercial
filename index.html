@@ -160,13 +160,8 @@ table.mc th:first-child,table.mc td:first-child{text-align:left;padding-left:0}
 table.mc th{color:var(--mut);font-weight:500;font-size:11px}
 table.mc tr.hi td{background:#f5f5f7;font-weight:600}
 table.mc .sub{color:var(--mut);font-size:11px;font-weight:400}
-.chgrid{display:flex;flex-direction:column;gap:10px}
-.chcard{border:1px solid var(--line2);border-radius:12px;padding:12px 14px}
-.chcard h5{margin:0 0 8px;font-size:14px;font-weight:600}
-.chcard .ang{margin-bottom:10px}
-.chres{display:flex;justify-content:space-between;gap:12px;font-size:13px;flex-wrap:wrap}
-.chres span{color:var(--mut)}
-.chres b{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+table.mc input{width:58px;max-width:100%;padding:4px 6px;font-size:12px;text-align:right}
+.secbox .scroll{overflow-x:auto}
 /* modal */
 .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-48%) scale(.98);width:560px;max-width:calc(100vw - 32px);background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.2);z-index:62;padding:24px 26px;opacity:0;pointer-events:none;transition:all .2s}
 .modal.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
@@ -1429,25 +1424,34 @@ function mcCanaisHtml(p,r,e0,c){
   </div>`;
   const chIds=['tiktok','shopee','site'];
   const pf=c&&c.pf!=null?c.pf:null;
-  const cards=chIds.map(id=>{
+  const dados=chIds.map(id=>{
     const ch=canalOf(id);
     const ct=calcCanal(pf,cmv,ch);
     const tot=qtd!=null&&ct.m!=null?ct.m*qtd:null;
-    const inp=(f,lab)=>`<label>${lab}<input inputmode="decimal" value="${fmtIn((ch[f]||0)*100)}" onchange="setCanal('${id}','${f}',this.value)"></label>`;
-    return `<div class="chcard">
-      <h5>${esc(ch.nome)}</h5>
-      <div class="ang">${inp('taxa','Taxa %')}${inp('impostos','Impostos %')}${inp('frete','Frete %')}${inp('afiliado','Afiliado %')}</div>
-      <div class="chres">
-        <span>Carga ${pct0(ct.carga)}</span>
-        <span>Por unidade <b class="${ct.m<0?'c-bad':''}">${ct.m==null?'—':brl(ct.m)}</b> ${ct.mp==null?'':'('+pct(ct.mp)+')'}</span>
-        ${qtd?`<span>No volume <b class="${tot<0?'c-bad':''}">${tot==null?'—':brl(tot)}</b></span>`:''}
-      </div>
-    </div>`;
+    return {id,ch,ct,tot};
+  });
+  let bestCh=-1,bestM=-1e15;
+  dados.forEach((d,i)=>{if(d.ct.m!=null&&d.ct.m>bestM){bestM=d.ct.m;bestCh=i}});
+  const rowsCh=dados.map((d,i)=>{
+    const inp=f=>`<input inputmode="decimal" value="${fmtIn((d.ch[f]||0)*100)}" onchange="setCanal('${d.id}','${f}',this.value)">`;
+    return `<tr class="${i===bestCh?'hi':''}">
+      <td>${esc(d.ch.nome)}</td>
+      <td>${inp('taxa')}</td>
+      <td>${inp('impostos')}</td>
+      <td>${inp('frete')}</td>
+      <td>${inp('afiliado')}</td>
+      <td>${pct0(d.ct.carga)}</td>
+      <td class="${d.ct.m<0?'c-bad':''}">${d.ct.m==null?'—':brl(d.ct.m)}<div class="sub">${d.ct.mp==null?'':pct(d.ct.mp)}</div></td>
+      ${qtd?`<td class="${d.tot<0?'c-bad':''}">${d.tot==null?'—':brl(d.tot)}</td>`:''}
+    </tr>`;
   }).join('');
   const chBox=`<div class="secbox">
     <h4>Se essa negociação passasse por um canal</h4>
-    <p class="lead">Mesmo preço da ficha${pf!=null?' ('+brl(pf)+')':''}, taxas editáveis só nesta sessão. Padrão: TikTok 26,81% e Shopee 27,96% sobre o bruto (setembro/2026); impostos 21,25% da Nutríssima; frete 0% nos marketplaces (pago pela plataforma). Afiliado começa em 0% — some 10% se a venda vier de afiliado. <a href="#" onclick="resetCanais();return false">Restaurar taxas</a></p>
-    <div class="chgrid">${cards}</div>
+    <p class="lead">Mesmo preço da ficha${pf!=null?' ('+brl(pf)+')':''}, taxas editáveis só nesta sessão. Padrão: TikTok 26,81% e Shopee 27,96% sobre o bruto (setembro/2026); impostos 21,25% da Nutríssima; frete 0% nos marketplaces (pago pela plataforma). Afiliado começa em 0% — some 10% se a venda vier de afiliado. A linha destacada é a que mais deixa para a empresa. <a href="#" onclick="resetCanais();return false">Restaurar taxas</a></p>
+    <div class="scroll"><table class="mc">
+      <thead><tr><th>Canal</th><th>Taxa %</th><th>Impostos %</th><th>Frete %</th><th>Afiliado %</th><th>Carga</th><th>Empresa / un.</th>${qtd?'<th>Empresa no volume</th>':''}</tr></thead>
+      <tbody>${rowsCh}</tbody>
+    </table></div>
   </div>`;
   return mcBox+chBox;
 }
