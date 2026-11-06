@@ -480,6 +480,21 @@ tr.row.off .pn{font-weight:400}
 @media(min-width:821px) and (max-width:1100px){
   #tabs{max-width:56vw}
 }
+
+/* Competition: quiet summary, one scrollable comparison table. */
+#tab-concorrencia .conControls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:18px 0}
+#tab-concorrencia label{font-size:12px;color:var(--mut);display:grid;gap:5px}
+#conFreq{width:140px}#conStatus{font-size:12px;color:var(--mut)}
+.conTable{overflow:auto;border-radius:var(--r);background:white;box-shadow:var(--sh)}
+.conTable table{min-width:1550px;width:100%;border-collapse:collapse}
+.conTable th{position:sticky;top:0;background:#f5f5f7;white-space:normal;font-size:11px}
+.conTable td,.conTable th{padding:13px 12px;text-align:right;border-bottom:1px solid var(--line);vertical-align:top}
+.conTable td:first-child,.conTable th:first-child,.conTable td:nth-child(7),.conTable th:nth-child(7){text-align:left;min-width:190px;max-width:260px;white-space:normal}
+.conTable td{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.conTable details{font-size:11px;line-height:1.6;color:var(--mut);margin-top:6px;white-space:normal}
+.conTable summary{cursor:pointer}.conTable p{margin:6px 0}
+.conInput{width:78px;border:1px solid var(--line);border-radius:8px;padding:7px;font:inherit;text-align:right}
+#conK .kpi b{font-size:26px}#conK{margin-top:18px}#conNotes{line-height:1.8;font-size:12px;margin-top:16px}#conProjection{margin-top:16px;font-size:13px;line-height:1.7}
 </style>
 </head>
 <body>
@@ -490,6 +505,7 @@ tr.row.off .pn{font-weight:400}
       <button data-tab="precos" class="on">Preços</button>
       <button data-tab="cmv">CMV</button>
       <button data-tab="negociacao">Negociação</button>
+      <button data-tab="concorrencia">Concorrência</button>
       <button data-tab="orcamento">Orçamento</button>
       <button data-tab="simulador">Simulador</button>
       <button data-tab="estados">Estados</button>
@@ -507,6 +523,23 @@ tr.row.off .pn{font-weight:400}
   </div>
 </header>
 <main>
+
+  <!-- CONCORRÊNCIA: source orders, never inferred monthly consumption -->
+  <section id="tab-concorrencia" class="hide">
+    <div class="top"><div class="title"><h2>Concorrência</h2><div class="cond" id="conCond"></div></div></div>
+    <div class="conControls">
+      <label>Cliente / concorrente<select class="sel" id="conClient" onchange="conClient(this.value)"></select></label>
+      <label>UF da simulação<select class="sel" id="conUf" onchange="CON.uf=this.value;renderCon()"></select></label>
+      <label>Pedidos iguais por mês (opcional)<input class="conInput" id="conFreq" inputmode="decimal" placeholder="Não informado" onchange="const n=num(this.value);if(this.value.trim()&&(n==null||!Number.isFinite(n)||n<=0)){toast('Frequência inválida',1);this.value=CON.freq}else{CON.freq=this.value;renderCon()}"></label>
+      <button class="btn sec" id="conEdit" type="button" onclick="conEdit()">Editar pedido</button>
+      <button class="btn hide" id="conSave" type="button" onclick="conSave()">Salvar pedido</button>
+      <button class="link" type="button" onclick="conLoad(true)">Atualizar dados</button><span id="conStatus"></span>
+    </div>
+    <div id="conK" class="kpis"></div>
+    <div class="conTable"><table aria-label="Pedido concorrente versus Laben"><thead><tr><th>Produto Doremus</th><th>Embalagem</th><th>Vol.</th><th>kg</th><th>Doremus<br>R$/kg</th><th>Total<br>Doremus</th><th>Equivalente Laben</th><th>Laben<br>R$/kg</th><th>Diferença<br>R$ e %</th><th>CMV<br>R$/kg</th><th>Tabela no volume<br>Receita / margem</th><th>Empatar no volume<br>Receita / margem</th></tr></thead><tbody id="conBody"></tbody></table></div>
+    <div class="card" id="conProjection"></div><div class="card" id="conNotes"></div>
+  </section>
+
   <!-- PREÇOS -->
   <section id="tab-precos">
     <div class="top">
@@ -882,9 +915,9 @@ const linhaRank=l=>{const i=LINHA_ORD.indexOf(l);return i<0?99:i};
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
   TAB=b.dataset.tab;
-  ['cmv','estados','precos','negociacao','orcamento','simulador','crm','forn','rep','ai','di'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
+  ['cmv','estados','precos','negociacao','concorrencia','orcamento','simulador','crm','forn','rep','ai','di'].forEach(t=>$('tab-'+t).classList.toggle('hide',t!==TAB));
   closeAll();window.scrollTo(0,0);
-  if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='orcamento')renderOrc();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();
+  if(TAB==='concorrencia'){renderCon();conLoad()}else if(TAB==='cmv')renderCmv();else if(TAB==='precos')renderPre();else if(TAB==='negociacao')renderNeg();else if(TAB==='orcamento')renderOrc();else if(TAB==='simulador')renderSim();else if(REL_CFG[TAB])relRender(TAB);else if(TAB==='ai')aiRender();else if(TAB==='di')diRender();
 });
 
 async function fetchAll(table,orderBy){
@@ -922,7 +955,7 @@ async function loadAll(){
   CMV.sort((x,y)=>ok(x.chave)-ok(y.chave)||x.chave.localeCompare(y.chave));
   CMV.forEach(c=>delete c._hay);
   if(!EST.some(x=>x.uf===UF))UF=(EST.find(x=>x.uf==='PE')||EST[0]||{}).uf;
-  renderEmp();renderCmv();renderEst();renderPre();if(TAB==='simulador')renderSim();if(TAB==='orcamento')renderOrc();
+  renderEmp();renderCmv();renderEst();renderPre();if(TAB==='concorrencia')renderCon();if(TAB==='simulador')renderSim();if(TAB==='orcamento')renderOrc();
 }
 
 /* switch de marca (Laben · com açúcar | Nutríssima · zero açúcar | Todas) — usado em Preços e CMV */
@@ -1131,10 +1164,10 @@ function lbrAliq(){const r=empRow('lbr');return r&&r.aliquota_simples!=null&&r.a
 function lbrBonif(){const r=empRow('lbr');return r&&r.simples_bonif_pct!=null?Number(r.simples_bonif_pct)||0:0}
 function bonImp(ct){return EMP==='lbr'?lbrBonif():(ct.imPct||0)}
 /* Nutríssima: sem mudança. LBR (Simples): ICMS/PIS/COFINS = 0 e a alíquota do Simples entra no lugar do imposto por dentro */
-function estEff(e){if(!e)return e;const o=AN[e.uf];let r=o?Object.assign({},e,o):e;
-  if(EMP==='lbr')r=Object.assign({},r,{imposto_pct:lbrAliq(),pis_pct:0,cofins_pct:0});return r}
-function calc(p,r,e0,ord,pfOv){
-  const e=estEff(e0);const an=AN[e.uf]||{};
+function estEff(e,empresa=EMP){if(!e)return e;const o=AN[e.uf];let r=o?Object.assign({},e,o):e;
+  if(empresa==='lbr')r=Object.assign({},r,{imposto_pct:lbrAliq(),pis_pct:0,cofins_pct:0});return r}
+function calc(p,r,e0,ord,pfOv,empresa=EMP){
+  const e=estEff(e0,empresa);const an=AN[e.uf]||{};
   const cmv=cmvOf(p.chave_cmv);
   let frPct=an.frete_pct!=null?Number(an.frete_pct):val(r,'frete_cif');
   if(frPct==null&&e.frete_pct!=null)frPct=Number(e.frete_pct);
@@ -1150,7 +1183,7 @@ function calc(p,r,e0,ord,pfOv){
   const hasImp=icms!=null||pis!=null||cof!=null;
   const im=hasImp?(icms||0)+(pis||0)+(cof||0):null;
   const fr=pf!=null&&frPct!=null?pf*frPct:null;
-  if(EMP==='lbr'&&lbrAliq()==null)return {cmv,fr,frPct,im:null,icms:null,pis:0,cof:0,imPct:null,pisPct:0,cofPct:0,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false,carga:null,semSimples:true};
+  if(empresa==='lbr'&&lbrAliq()==null)return {cmv,fr,frPct,im:null,icms:null,pis:0,cof:0,imPct:null,pisPct:0,cofPct:0,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false,carga:null,semSimples:true};
   if(pf==null||cmv==null)return {cmv,fr,frPct,im,icms,pis,cof,imPct,pisPct,cofPct,pf,cd,vv:null,custos:null,m:null,mp:null,fromTabela:false,carga:null};
   const vv=pf*cd;
   const custos=cmv+(im||0)+(fr||0)+vv;
@@ -2521,6 +2554,87 @@ async function orcTabPdf(){try{await loadScript('https://cdnjs.cloudflare.com/aj
 
 function orcPill(c){if(!c||c.mp==null)return '<span class="pill na">—</span>';const v=c.mp*10;return `<span class="pill ${v<0?'bad':v<ORC_MIN?'warn':'ok'}">${idx(c.mp)}</span>`}
 orcLoad();
+/* ---------- Concorrência: pedidos reais, não consumo mensal presumido ---------- */
+const CON_FALLBACK={"cliente":{"nome":"Alex","segmento":"açaí","concorrente":"Doremus","uf":null,"fonte":"Foto de pedido/cotação recebida em 06/11/2026","data_ref":"2026-11-06","obs":"Recorte sem cabeçalho: sem data do pedido, razão social ou total geral visível. Volume deste pedido, não consumo mensal. UM=KG. VOL=número de volumes/caixas. ICMS-ST total R$ 0,00. Pagto Antecipado cortado. COFINS cortada no 7: alíquota desconhecida. Item 14: 10 kg na foto vs embalagem 6×4 kg (24 kg). UF do cliente desconhecida."},"itens":[{"item_n":1,"cod":"4357","produto":"RECHEIO CHOCOLATE BRANCO CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":21.62,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente B2B identificado."},{"item_n":2,"cod":"4358","produto":"RECHEIO CHOCOLATE AO LEITE CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":23.77,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":"996","nosso_chave_cmv":"CHOCOLATE|1KG","match_obs":"Chocolate ao leite — comparação por kg no pote 1,01 kg."},{"item_n":3,"cod":"4356","produto":"RECHEIO PACOCA CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":23.35,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente B2B. Paçoca Nutríssima 250/600 g é varejo e não foi usada como par."},{"item_n":4,"cod":"5218","produto":"CREME DE DORELLA","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":31.59,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":"965","nosso_chave_cmv":"AVELA|1KG","match_obs":"Dorella = chocolate com avelã. Comparação comercial com Avellan, não Linha Chef."},{"item_n":5,"cod":"4364","produto":"RECHEIO LEITINHO CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":31.76,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":"LALA|1KG","match_obs":"Equivalente Lala Cream; não Ganache de Leite."},{"item_n":6,"cod":"5343","produto":"RECHEIO TORTA DE LIMAO CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":23.63,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente identificado."},{"item_n":7,"cod":"5344","produto":"RECHEIO MOUSSE DE MARACUJA CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":27.8,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente identificado."},{"item_n":8,"cod":"4360","produto":"RECHEIO CREME DE COCO BRANCO CONF","embalagem":"8X1.01KG","um":"KG","ncm":"21069090","qtde":16.16,"volumes":2,"preco_unit":27.99,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente identificado."},{"item_n":9,"cod":"1681","produto":"PASTA CREME AMERICANO","embalagem":"12X1KG","um":"KG","ncm":"21069090","qtde":12,"volumes":1,"preco_unit":38.78,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente identificado; sabor não confirmado."},{"item_n":10,"cod":"5364","produto":"PASTA MORANGO PLUS","embalagem":"12X1KG","um":"KG","ncm":"21069090","qtde":12,"volumes":1,"preco_unit":36.12,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":"MORANGO|1KG","match_obs":"Comparação de sabor com Creme de Morango 1,01 kg; validar aplicação/rendimento. CMV ausente: margem não calculada."},{"item_n":11,"cod":"2280","produto":"DOREMAX MARACUJÁ","embalagem":"10X1KG","um":"KG","ncm":"21069090","qtde":10,"volumes":1,"preco_unit":21.13,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Sem equivalente identificado."},{"item_n":12,"cod":"2279","produto":"DOREMAX CREME","embalagem":"10X1KG","um":"KG","ncm":"21069090","qtde":10,"volumes":1,"preco_unit":19.93,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Nome genérico: não assumir avelã. Sem equivalente confirmado."},{"item_n":13,"cod":"3571","produto":"CORANTE ROXO ACAI","embalagem":"10X1KG","um":"KG","ncm":"32041300","qtde":20,"volumes":2,"preco_unit":39.62,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":null,"match_obs":"Corante, não é creme. Sem equivalente."},{"item_n":14,"cod":"3058","produto":"DOREMAX LEITINHO","embalagem":"6X4KG","um":"KG","ncm":"21069029","qtde":10,"volumes":1,"preco_unit":32.65,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":"LALA|1KG","match_obs":"Inconsistência da foto: QTDE 10 kg, mas 6×4 kg = 24 kg/volume. Mantidos 10 kg. Doremax é linha mais fluida para açaí; comparar com Lala 1,01 kg e validar rendimento; não há Lala 4 kg."},{"item_n":15,"cod":"4859","produto":"LEITINHO ESSENCIAL","embalagem":"6X4KG","um":"KG","ncm":"21069090","qtde":24,"volumes":1,"preco_unit":30.57,"icms_pct":0.18,"st_pct":0,"pis_pct":0.0165,"cofins_pct":null,"nosso_codigo":null,"nosso_chave_cmv":"LALA|1KG","match_obs":"Compra em balde 4 kg. Não temos Lala em baldes 3/4/10/20 kg; comparação por kg com pote 1,01 kg. Validar aplicação/rendimento."}]};
+let CON={clientes:[{...CON_FALLBACK.cliente,id:'foto-alex'}],itens:CON_FALLBACK.itens.map(i=>({...i,cliente_id:'foto-alex'})),sel:'foto-alex',uf:'SP',freq:'',loaded:false,loading:false,fallback:true,edit:false,dirty:{},saving:false};
+const conNum=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2});
+async function conLoad(force=false){
+  if(CON.loading||CON.loaded&&!force)return;
+  if(force&&Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas e recarregar?'))return;
+  CON.loading=true;
+  try{
+    const [c,i]=await Promise.all([sb.from('concorrencia_clientes').select('*').order('nome'),sb.from('concorrencia_itens').select('*').order('item_n')]);
+    if(c.error||i.error||!c.data?.length)throw new Error(c.error?.message||i.error?.message||'Sem clientes acessíveis');
+    CON.clientes=c.data;CON.itens=i.data||[];CON.fallback=false;CON.dirty={};CON.edit=false;
+    if(!CON.clientes.some(c=>c.id===CON.sel))CON.sel=(CON.clientes.find(c=>c.nome==='Alex')||CON.clientes[0]).id;
+  }catch(e){CON.fallback=true;console.warn('Concorrência: usando cópia da foto',e.message)}
+  finally{CON.loaded=true;CON.loading=false;if(TAB==='concorrencia')renderCon()}
+}
+function conClient(id){if(Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?')){renderCon();return}CON.sel=id;CON.dirty={};CON.edit=false;CON.freq='';renderCon()}
+function conEdit(){if(CON.edit&&Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?'))return;CON.edit=!CON.edit;CON.dirty={};renderCon()}
+function conChange(item,f,raw){const v=num(raw);if(v==null||!Number.isFinite(v)||v<0){toast('Informe um valor válido, maior ou igual a zero',1);renderCon();return}if(!CON.dirty[item])CON.dirty[item]={};CON.dirty[item][f]=v;renderCon()}
+async function conSave(){
+  if(CON.fallback||CON.saving)return;
+  const changed=Object.entries(CON.dirty).map(([n,d])=>{const i=CON.itens.find(i=>i.cliente_id===CON.sel&&i.item_n===Number(n));return i?{...i,...d,updated_at:new Date().toISOString()}:null}).filter(Boolean);
+  if(!changed.length)return;CON.saving=true;renderCon();
+  try{const {error}=await sb.from('concorrencia_itens').upsert(changed,{onConflict:'id'});if(error)throw error;
+    changed.forEach(v=>Object.assign(CON.itens.find(i=>i.id===v.id),v));CON.dirty={};CON.edit=false;toast('Pedido atualizado. Produtos e CMVs não foram alterados.');
+  }catch(e){toast('Não foi possível salvar: '+e.message,1)}finally{CON.saving=false;renderCon()}
+}
+function conRows(){return CON.itens.filter(i=>i.cliente_id===CON.sel).map(i=>({...i,...CON.dirty[i.item_n]})).sort((a,b)=>a.item_n-b.item_n)}
+function conProduct(i){if(!i.nosso_chave_cmv)return null;return PROD.find(p=>p.chave_cmv===i.nosso_chave_cmv&&(!i.nosso_codigo||p.codigo===i.nosso_codigo))||null}
+function conItem(i,e){
+  const q=Number(i.qtde),price=Number(i.preco_unit),total=q*price,p=conProduct(i);
+  const out={i,q,price,total,matched:!!i.nosso_chave_cmv,p};
+  if(!p)return out;
+  // Principal: pote de 1,01 kg, nunca arredondar o peso para 1 kg.
+  const peso=1.01,tab=p.preco_tabela==null?null:Number(p.preco_tabela),cmv=cmvOf(p.chave_cmv);
+  Object.assign(out,{kgPrice:tab==null?null:tab/peso,cmvKg:cmv==null?null:cmv/peso,revenue:tab==null?null:q*tab/peso,matchRevenue:total});
+  if(out.kgPrice!=null){out.gap=out.kgPrice-price;out.gapPct=price?out.gap/price:null}
+  if(e){const r=preRow(e.uf,p.id)||{};
+    const t=calc(p,r,e,1,tab,'lbr'),m=calc(p,r,e,1,price*peso,'lbr');
+    out.margin=tab==null||t.m==null?null:t.m*q/peso;out.matchMargin=m.m==null?null:m.m*q/peso;
+    out.carga=t.semSimples?null:(t.imPct||0)+(t.pisPct||0)+(t.cofPct||0)+(t.frPct||0)+(t.cd||0);
+  }
+  return out;
+}
+function conSummary(rows){
+  const matched=rows.filter(r=>r.matched),known=matched.filter(r=>r.margin!=null&&r.matchMargin!=null),priced=matched.filter(r=>r.revenue!=null);
+  const sum=(a,f)=>a.reduce((s,r)=>s+(Number(r[f])||0),0);
+  return {kg:sum(rows,'q'),total:sum(rows,'total'),matchedKg:sum(matched,'q'),matchedTotal:sum(matched,'total'),revenue:priced.length===matched.length&&matched.length?sum(matched,'revenue'):null,matchRevenue:matched.length?sum(matched,'total'):null,margin:known.length?sum(known,'margin'):null,matchMargin:known.length?sum(known,'matchMargin'):null,knownKg:sum(known,'q'),known:known.length,matched:matched.length,partial:known.length<matched.length};
+}
+function renderCon(){
+  if(!$('conBody'))return;
+  const client=CON.clientes.find(c=>c.id===CON.sel)||CON.clientes[0];if(!client)return;
+  const e=EST.find(e=>e.uf===CON.uf),rows=conRows().map(i=>conItem(i,e)),s=conSummary(rows);
+  $('conClient').innerHTML=CON.clientes.map(c=>`<option value="${esc(c.id)}" ${c.id===client.id?'selected':''}>${esc(c.nome)} · ${esc(c.concorrente)}</option>`).join('');
+  $('conUf').innerHTML=EST.map(e=>`<option value="${esc(e.uf)}" ${e.uf===CON.uf?'selected':''}>${esc(e.uf)} · ${esc(e.nome)}</option>`).join('');
+  $('conFreq').value=CON.freq;
+  $('conEdit').disabled=CON.fallback||CON.saving;$('conEdit').textContent=CON.edit?'Cancelar edição':'Editar pedido';
+  $('conSave').classList.toggle('hide',!CON.edit);$('conSave').disabled=CON.saving||!Object.keys(CON.dirty).length;
+  $('conStatus').textContent=CON.loading?'Carregando…':CON.fallback?'Cópia de segurança da foto · edição indisponível até conectar os dados':'Salvo no painel · '+rows.length+' itens'+(Object.keys(CON.dirty).length?' · alterações não salvas':'');
+  const eff=e?Object.assign({},e,AN[e.uf]||{}):null;
+  $('conCond').innerHTML=`<b>${esc(client.nome)} · ${esc(client.segmento)} · ${esc(client.concorrente)}</b> · UF do cliente: ${client.uf?esc(client.uf):'não informada'} · Simulação: <b>LBR · Simples Nacional · ${esc(CON.uf)}</b><br>Simples ${pct0(lbrAliq())} + frete ${pct0(eff?.frete_pct==null?null:Number(eff.frete_pct))} + comissão ${pct0(Number(eff?.comissao_pct)||0)} + degustação ${pct0(Number(eff?.degustacao_pct)||0)}. ICMS/PIS/COFINS da LBR: 0%. ${rows.some(r=>r.carga!=null)?'Carga total nos itens: '+[...new Set(rows.filter(r=>r.carga!=null).map(r=>pct0(r.carga)))].join(' / ')+'.':''} ${!e||lbrAliq()==null?'<strong class="c-warn">Sem cadastro tributário completo: margem indisponível.</strong>':''}`;
+  const part=s.partial?'Margem parcial conhecida':'Margem empresa';
+  $('conK').innerHTML=`<div class="kpi"><span>Volume deste pedido</span><b>${conNum(s.kg)} kg</b><small>${brl(s.total)} na ${esc(client.concorrente)} · ticket ${brl(s.kg?s.total/s.kg:null)}/kg</small></div>
+    <div class="kpi"><span>Com equivalente de sabor · ${s.matched} itens</span><b>${conNum(s.matchedKg)} kg</b><small>${brl(s.matchedTotal)} na concorrência</small><small>Sem par: ${conNum(s.kg-s.matchedKg)} kg · ${brl(s.total-s.matchedTotal)}</small></div>
+    <div class="kpi"><span>Trazer o volume · preço de tabela</span><b>${brl(s.revenue)}</b><small>${part}: <strong>${brl(s.margin)}</strong></small><small>CMV conhecido: ${conNum(s.knownKg)} de ${conNum(s.matchedKg)} kg</small></div>
+    <div class="kpi"><span>Trazer o volume · empatar ${esc(client.concorrente)}</span><b>${brl(s.matchRevenue)}</b><small>${part}: <strong>${brl(s.matchMargin)}</strong></small><small>Mesmos kg, sem presumir frequência</small></div>`;
+  const cell=(i,f,v)=>CON.edit?`<input class="conInput" aria-label="${esc(f)} item ${i.item_n}" inputmode="decimal" value="${esc(fmtIn(v))}" onchange="conChange(${i.item_n},'${f}',this.value)" ${CON.saving?'disabled':''}>`:conNum(v);
+  const scenario=(rec,margin)=>rec==null?'—':`<strong>${brl(rec)}</strong><div class="sub ${margin!=null&&margin<0?'c-bad':''}">Margem ${brl(margin)}</div>`;
+  $('conBody').innerHTML=rows.map(r=>{const {i}=r;return `<tr>
+    <td><strong>${i.item_n}. ${esc(nice(i.produto))}</strong><div class="sub">Cód. ${esc(i.cod)}</div><details><summary>Detalhes</summary><p>${esc(i.match_obs)}</p><p>UM ${esc(i.um)} · NCM ${esc(i.ncm)}<br>ICMS ${pct0(i.icms_pct==null?null:Number(i.icms_pct))} · ST ${pct0(i.st_pct==null?null:Number(i.st_pct))} · PIS ${pct0(i.pis_pct==null?null:Number(i.pis_pct))}<br>COFINS ${i.cofins_pct==null?'não legível (nulo)':pct0(Number(i.cofins_pct))}</p></details></td>
+    <td>${esc(i.embalagem)}</td><td>${cell(i,'volumes',i.volumes)}</td><td>${cell(i,'qtde',i.qtde)}</td><td>${CON.edit?cell(i,'preco_unit',i.preco_unit):brl(r.price)}</td><td>${brl(r.total)}</td>
+    <td>${r.p?esc(nice(r.p.descricao)):r.matched?'<span class="c-warn">Equivalente não carregado</span>':'<span class="c-mut">Sem equivalente</span>'}${r.matched?'<div class="sub">Pote 1,01 kg · validar aplicação</div>':''}</td>
+    <td>${brl(r.kgPrice)}${r.p?`<div class="sub">${brl(Number(r.p.preco_tabela))} / pote</div>`:''}</td>
+    <td class="${r.gap==null?'':r.gap>0?'c-bad':'c-ok'}">${r.gap==null?'—':(r.gap>0?'+':'')+brl(r.gap)}<div class="sub">${r.gap==null?'':(r.gap>0?'+':'')+pct(r.gapPct)}</div></td>
+    <td>${brl(r.cmvKg)}${r.matched&&r.cmvKg==null?'<div class="sub">Sem CMV</div>':''}</td>
+    <td>${scenario(r.revenue,r.margin)}</td><td>${scenario(r.matched?r.matchRevenue:null,r.matchMargin)}</td></tr>`}).join('');
+  $('conNotes').innerHTML=`<b>Volume = este pedido. Não é consumo mensal.</b> Total calculado por kg × R$/kg (sem arredondar as linhas antes de somar). Todos os itens são Doremus. Preços comparados por kg, sem supor rendimento idêntico; validar aplicação, textura e embalagem.<br><b class="c-warn">Item 14 · Doremax Leitinho:</b> foto informa 10 kg; embalagem 6×4 kg corresponderia a 24 kg/volume. Mantidos os 10 kg da fonte, a confirmar.<br>Morango: preço comparável, mas sem CMV — nenhuma margem foi atribuída; os cards mostram a soma parcial apenas de itens com CMV (${s.known}/${s.matched}). Margem por dentro = receita × (1 − carga total) − CMV do volume. Receita teórica em kg equivalentes, sem arredondar para potes/caixas fechadas. Frete por produto/UF é respeitado quando cadastrado.<br><details><summary>Fonte e ressalvas</summary><p>${esc(client.fonte)}. Data de referência da fonte: ${esc(client.data_ref)} (não é data confirmada do pedido).</p><p>${esc(client.obs)}</p><p>O ICMS de 18% e o PIS de 1,65% são os da cotação Doremus; não entram como tributos da LBR. COFINS cortada no “7”: armazenada como nula. Total ICMS-ST visível: R$ 0,00. “Pagto Antecipado” está cortado.</p></details>`;
+  const freq=num(CON.freq);
+  $('conProjection').innerHTML=freq!=null&&freq>0?`<b>Projeção hipotética · ${conNum(freq)} pedido(s) iguais por mês</b><p>${conNum(s.matchedKg*freq)} kg substituíveis/mês · Tabela: receita ${brl(s.revenue==null?null:s.revenue*freq)} e margem ${s.partial?'parcial ':''}${brl(s.margin==null?null:s.margin*freq)} · Empate: receita ${brl(s.matchRevenue==null?null:s.matchRevenue*freq)} e margem ${s.partial?'parcial ':''}${brl(s.matchMargin==null?null:s.matchMargin*freq)}.</p><span class="muted">Somente hipótese informada neste campo; frequência de compra ainda não confirmada.</span>`:'Sem frequência informada: os potenciais acima são de um único pedido.';
+}
+
 /* ---------- navegação mobile ---------- */
 (function(){
   const NAV=[...document.querySelectorAll('#tabs button')].map(b=>[b.dataset.tab,b.textContent.trim()]);
