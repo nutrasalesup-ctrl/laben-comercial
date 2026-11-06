@@ -1370,7 +1370,13 @@ function pesoKg(p){
   for(const s of src){const m=String(s).match(/(\d+(?:[.,]\d+)?)\s*(kg|g)\b/i);if(m){const n=parseFloat(m[1].replace(',','.'));if(isFinite(n)&&n>0)return /kg/i.test(m[2])?n:n/1000}}
   return null;
 }
-function precoMc(cmv,alvo){if(cmv==null||alvo>=1)return null;return cmv/(1-alvo)}
+function cargaVar(p,r,e0){
+  const c1=calc(p,r,e0,FAIXA,1);
+  if(c1.m==null||c1.cmv==null)return null;
+  const carga=1-(c1.m+c1.cmv);
+  return isFinite(carga)?carga:null;
+}
+function precoMc(cmv,alvo,carga){if(cmv==null||carga==null)return null;const den=1-carga-alvo;if(den<=1e-9)return null;return cmv/den}
 function setMcQtd(raw){
   const v=num(raw);
   if(v==null||v===''){MC_QTD=null;renderDrawer();return}
@@ -1398,17 +1404,18 @@ function mcCanaisHtml(p,r,e0,c){
   const qtd=MC_QTD;
   const vol=`<div class="mcq"><label>Volume negociado (unidades)<input inputmode="decimal" value="${qtd==null?'':fmtIn(qtd)}" placeholder="ex.: 50" onchange="setMcQtd(this.value)"></label><span class="muted">${qtd?qtd.toLocaleString('pt-BR')+' un. nesta simulação':'Digite a quantidade para ver o total da negociação'}</span></div>`;
   if(cmv==null)return `<div class="secbox"><h4>Preço por margem de contribuição</h4><p class="lead">Sem CMV não dá para calcular as faixas nem os canais.</p>${vol}</div>`;
-  const mcAtual=(c&&c.pf!=null)?(c.pf-cmv)/c.pf:null;
+  const cargaEst=cargaVar(p,r,e0);
+  const mcAtual=(c&&c.mp!=null)?c.mp:null;
   let best=0,bestD=1e9;
-  MC_ALVOS.forEach((a,i)=>{const d=mcAtual==null?Math.abs(a-0.55):Math.abs(a-mcAtual);if(d<bestD){bestD=d;best=i}});
+  MC_ALVOS.forEach((a,i)=>{const d=mcAtual==null?Math.abs(a-0.50):Math.abs(a-mcAtual);if(d<bestD){bestD=d;best=i}});
   const rows=MC_ALVOS.map((alvo,i)=>{
-    const preco=precoMc(cmv,alvo);
-    const pkg=kg?preco/kg:null;
-    const ct=calc(p,r,e0,FAIXA,preco);
+    const preco=precoMc(cmv,alvo,cargaEst);
+    const pkg=preco!=null&&kg?preco/kg:null;
+    const ct=preco==null?{m:null,mp:null}:calc(p,r,e0,FAIXA,preco);
     const tot=qtd!=null&&ct.m!=null?ct.m*qtd:null;
     return `<tr class="${i===best?'hi':''}">
-      <td>${pct(alvo)}${i===best&&mcAtual!=null?'<div class="sub">mais próxima do preço atual ('+pct(mcAtual)+')</div>':''}</td>
-      <td>${brl(preco)}</td>
+      <td>${pct(alvo)}<div class="sub">índice ${idx(alvo)}</div>${i===best&&mcAtual!=null?'<div class="sub">mais próxima do preço atual (índice '+idx(mcAtual)+')</div>':''}</td>
+      <td>${preco==null?'—':brl(preco)}</td>
       <td>${pkg==null?'—':brl(pkg)}</td>
       <td class="${ct.m<0?'c-bad':''}">${ct.m==null?'—':brl(ct.m)}<div class="sub">${ct.mp==null?'':'índice '+idx(ct.mp)}</div></td>
       ${qtd?`<td class="${tot<0?'c-bad':''}">${tot==null?'—':brl(tot)}</td>`:''}
@@ -1416,7 +1423,7 @@ function mcCanaisHtml(p,r,e0,c){
   }).join('');
   const mcBox=`<div class="secbox">
     <h4>Preço por margem de contribuição</h4>
-    <p class="lead">Preço da embalagem para sobrar ${pct(MC_ALVOS[0])} a ${pct(MC_ALVOS[MC_ALVOS.length-1])} depois do CMV (preço = CMV ÷ (1 − margem)). A coluna da empresa usa a carga deste estado (impostos, frete, comissão e degustação), por dentro.</p>
+    <p class="lead">Mesma margem do topo da ficha (índice): o que sobra para a empresa depois de impostos, frete, comissão, degustação e CMV, por dentro. Índice 5,0 = 50%. O preço da embalagem já inclui a carga deste estado.</p>
     ${vol}
     <table class="mc">
       <thead><tr><th>Margem</th><th>Preço da embalagem</th><th>Preço por kg</th><th>Empresa / un.</th>${qtd?'<th>Empresa no volume</th>':''}</tr></thead>
