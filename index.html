@@ -122,7 +122,7 @@ th.ed,td.ed{background:#fcfcfd}
 /* drawer */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
 .ov.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(860px,96vw);max-width:100vw;background:#fff;z-index:61;box-shadow:-8px 0 40px rgba(0,0,0,.12);transform:translateX(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(940px,96vw);max-width:100vw;background:#fff;z-index:61;box-shadow:-8px 0 40px rgba(0,0,0,.12);transform:translateX(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
 .drawer.on{transform:none}
 .drawer thead th{position:static;top:auto;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;z-index:auto}
 .dh{padding:20px 24px 16px;border-bottom:1px solid var(--line2);position:relative}
@@ -162,6 +162,10 @@ table.mc th{color:var(--mut);font-weight:500;font-size:11px}
 table.mc tr.hi td{background:#f5f5f7;font-weight:600}
 table.mc .sub{color:var(--mut);font-size:11px;font-weight:400}
 table.mc input{width:72px;max-width:100%;padding:5px 8px;font-size:13px;text-align:right}
+table.mc input.pct{width:56px}
+table.mc input.pf{width:76px}
+table.mc input.fix{width:68px}
+table.mc input.un{width:48px}
 .secbox .scroll{overflow-x:auto}
 /* modal */
 .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-48%) scale(.98);width:560px;max-width:calc(100vw - 32px);background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.2);z-index:62;padding:24px 26px;opacity:0;pointer-events:none;transition:all .2s}
@@ -1356,9 +1360,9 @@ function anClearProd(uf,pid){delete ANP[anPk(uf,pid)];delete AN[uf];toast('Anál
 const MC_ALVOS=[0.55,0.50,0.45,0.40,0.35];
 let MC_QTD=null;
 const CANAL_DEF={
-  tiktok:{nome:'TikTok',taxa:0.2681,impostos:0.2125,frete:0,afiliado:0},
-  shopee:{nome:'Shopee',taxa:0.2796,impostos:0.2125,frete:0,afiliado:0},
-  site:{nome:'Site',taxa:0,impostos:0.2125,frete:0,afiliado:0}
+  tiktok:{nome:'TikTok',taxa:0.2681,impostos:0.2125,frete:0,afiliado:0,fixo:0,unPedido:1},
+  shopee:{nome:'Shopee',taxa:0.2796,impostos:0.2125,frete:0,afiliado:0,fixo:0,unPedido:1},
+  site:{nome:'Site',taxa:0,impostos:0.2125,frete:0,afiliado:0,fixo:0,unPedido:1}
 };
 function loadCanais(){
   try{const o=JSON.parse(localStorage.getItem('laben-canais')||'{}');return o&&typeof o==='object'?o:{}}catch(e){return {}}
@@ -1383,21 +1387,54 @@ function setMcQtd(raw){
   if(Number.isNaN(v)||v<=0){toast('Volume inválido',1);renderDrawer();return}
   MC_QTD=v;renderDrawer();
 }
+function saveCanal(){localStorage.setItem('laben-canais',JSON.stringify(CANAL));renderDrawer()}
 function setCanal(id,f,raw){
   const v=num(raw);
   if(Number.isNaN(v)||v<0){toast('Percentual inválido',1);renderDrawer();return}
   if(!CANAL[id])CANAL[id]={};
   if(v==null)delete CANAL[id][f];else CANAL[id][f]=v/100;
-  localStorage.setItem('laben-canais',JSON.stringify(CANAL));
+  saveCanal();
+}
+function setCanalFixo(id,raw){
+  const v=num(raw);
+  if(Number.isNaN(v)||v<0){toast('Valor fixo inválido',1);renderDrawer();return}
+  if(!CANAL[id])CANAL[id]={};
+  if(v==null)delete CANAL[id].fixo;else CANAL[id].fixo=v;
+  saveCanal();
+}
+function setCanalUnPedido(id,raw){
+  const v=num(raw);
+  if(v==null){if(CANAL[id])delete CANAL[id].unPedido;saveCanal();return}
+  if(Number.isNaN(v)||v<=0){toast('Unidades por pedido inválidas',1);renderDrawer();return}
+  if(!CANAL[id])CANAL[id]={};
+  CANAL[id].unPedido=v;
+  saveCanal();
+}
+function loadCanalPrecos(){
+  try{const o=JSON.parse(localStorage.getItem('laben-canal-precos')||'{}');return o&&typeof o==='object'?o:{}}catch(e){return {}}
+}
+let CANAL_PF=loadCanalPrecos();
+function canalPfKey(pid,id){return pid+'|'+id}
+function canalPreco(pid,id){const v=CANAL_PF[canalPfKey(pid,id)];return v==null||v===''?null:Number(v)}
+function setCanalPreco(pid,id,raw){
+  const v=num(raw);
+  if(Number.isNaN(v)||(v!=null&&v<=0)){toast('Preço inválido',1);renderDrawer();return}
+  const k=canalPfKey(pid,id);
+  if(v==null)delete CANAL_PF[k];else CANAL_PF[k]=Math.round(v*100)/100;
+  localStorage.setItem('laben-canal-precos',JSON.stringify(CANAL_PF));
   renderDrawer();
 }
 function resetCanais(){CANAL={};localStorage.removeItem('laben-canais');toast('Taxas dos canais restauradas');renderDrawer()}
 function calcCanal(pf,cmv,ch){
   const carga=(Number(ch.impostos)||0)+(Number(ch.taxa)||0)+(Number(ch.frete)||0)+(Number(ch.afiliado)||0);
-  if(pf==null||cmv==null)return {carga,m:null,mp:null};
-  const m=pf*(1-carga)-cmv;
-  return {carga,m,mp:pf?m/pf:null};
+  const unPed=Number(ch.unPedido)>0?Number(ch.unPedido):1;
+  const fixo=Number(ch.fixo)||0;
+  const fixoUn=fixo/unPed;
+  if(pf==null||cmv==null)return {carga,fixo,unPed,fixoUn,m:null,mp:null};
+  const m=pf*(1-carga)-cmv-fixoUn;
+  return {carga,fixo,unPed,fixoUn,m,mp:pf?m/pf:null};
 }
+function goConcorrencia(){closeAll();const b=document.querySelector('#tabs [data-tab=concorrencia]');if(b)b.click()}
 function mcCanaisHtml(p,r,e0,c){
   const cmv=c&&c.cmv!=null?c.cmv:cmvOf(p.chave_cmv);
   const kg=pesoKg(p);
@@ -1431,33 +1468,42 @@ function mcCanaisHtml(p,r,e0,c){
     </table>
   </div>`;
   const chIds=['tiktok','shopee','site'];
-  const pf=c&&c.pf!=null?c.pf:null;
+  const pfFicha=c&&c.pf!=null?c.pf:null;
   const dados=chIds.map(id=>{
     const ch=canalOf(id);
+    const pfPrat=canalPreco(p.id,id);
+    const pf=pfPrat!=null?pfPrat:pfFicha;
     const ct=calcCanal(pf,cmv,ch);
     const tot=qtd!=null&&ct.m!=null?ct.m*qtd:null;
-    return {id,ch,ct,tot};
+    return {id,ch,ct,tot,pf,pfPrat};
   });
   let bestCh=-1,bestM=-1e15;
   dados.forEach((d,i)=>{if(d.ct.m!=null&&d.ct.m>bestM){bestM=d.ct.m;bestCh=i}});
   const rowsCh=dados.map((d,i)=>{
-    const inp=f=>`<input inputmode="decimal" value="${fmtIn((d.ch[f]||0)*100)}" onchange="setCanal('${d.id}','${f}',this.value)">`;
+    const inp=f=>`<input class="pct" inputmode="decimal" value="${fmtIn((d.ch[f]||0)*100)}" onchange="setCanal('${d.id}','${f}',this.value)">`;
+    const inpPf=`<input class="pf${d.pfPrat!=null?' dirty':''}" inputmode="decimal" value="${d.pf==null?'':fmtIn(d.pf)}" placeholder="${pfFicha==null?'—':fmtIn(pfFicha)}" onchange="setCanalPreco('${p.id}','${d.id}',this.value)">`;
+    const inpFix=`<input class="fix" inputmode="decimal" value="${fmtIn(d.ch.fixo||0)}" placeholder="0" onchange="setCanalFixo('${d.id}',this.value)">`;
+    const inpUn=`<input class="un" inputmode="decimal" value="${fmtIn(d.ch.unPedido||1)}" placeholder="1" onchange="setCanalUnPedido('${d.id}',this.value)">`;
+    const cargaTxt=pct0(d.ct.carga)+(d.ct.fixo?`<div class="sub">+ ${brl(d.ct.fixo)}/pedido</div>`:'');
     return `<tr class="${i===bestCh?'hi':''}">
       <td>${esc(d.ch.nome)}</td>
+      <td>${inpPf}</td>
       <td>${inp('taxa')}</td>
       <td>${inp('impostos')}</td>
       <td>${inp('frete')}</td>
       <td>${inp('afiliado')}</td>
-      <td>${pct0(d.ct.carga)}</td>
+      <td>${inpFix}</td>
+      <td>${inpUn}</td>
+      <td>${cargaTxt}</td>
       <td class="${d.ct.m<0?'c-bad':''}">${d.ct.m==null?'—':brl(d.ct.m)}<div class="sub">${d.ct.mp==null?'':pct(d.ct.mp)}</div></td>
       ${qtd?`<td class="${d.tot<0?'c-bad':''}">${d.tot==null?'—':brl(d.tot)}</td>`:''}
     </tr>`;
   }).join('');
   const chBox=`<div class="secbox">
     <h4>Se essa negociação passasse por um canal</h4>
-    <p class="lead">Mesmo preço da ficha${pf!=null?' ('+brl(pf)+')':''}, taxas editáveis só nesta sessão. Padrão: TikTok 26,81% e Shopee 27,96% sobre o bruto (setembro/2026); impostos 21,25% da Nutríssima; frete 0% nos marketplaces (pago pela plataforma). Afiliado começa em 0% — some 10% se a venda vier de afiliado. A linha destacada é a que mais deixa para a empresa. <a href="#" onclick="resetCanais();return false">Restaurar taxas</a></p>
+    <p class="lead">Preencha o preço praticado em cada plataforma (se ficar vazio, usa o da ficha). A taxa fixa é por pedido de despacho, não por pote: se o TikTok ou a Shopee cobram R$ 6,00 para enviar 1 ou 2 potes no mesmo pedido, coloque 6,00 no fixo e 2 em “un. no pedido”. Padrão das taxas: TikTok 26,81% e Shopee 27,96% sobre o bruto (setembro/2026); impostos 21,25% da Nutríssima; frete 0% nos marketplaces. Afiliado começa em 0% — some 10% se a venda vier de afiliado. A linha destacada é a que mais deixa para a empresa. A comparação com a concorrência (Alex / Doremus) fica na aba <a href="#" onclick="goConcorrencia();return false">Concorrência</a>. <a href="#" onclick="resetCanais();return false">Restaurar taxas</a></p>
     <div class="scroll"><table class="mc">
-      <thead><tr><th>Canal</th><th>Taxa %</th><th>Impostos %</th><th>Frete %</th><th>Afiliado %</th><th>Carga</th><th>Empresa / un.</th>${qtd?'<th>Empresa no volume</th>':''}</tr></thead>
+      <thead><tr><th>Canal</th><th>Preço</th><th>Taxa %</th><th>Impostos %</th><th>Frete %</th><th>Afiliado %</th><th>Fixo R$/pedido</th><th>Un. no pedido</th><th>Carga</th><th>Empresa / un.</th>${qtd?'<th>Empresa no volume</th>':''}</tr></thead>
       <tbody>${rowsCh}</tbody>
     </table></div>
   </div>`;
