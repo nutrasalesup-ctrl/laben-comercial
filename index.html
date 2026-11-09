@@ -494,6 +494,26 @@ tr.row.off .pn{font-weight:400}
 .conTable details{font-size:11px;line-height:1.6;color:var(--mut);margin-top:6px;white-space:normal}
 .conTable summary{cursor:pointer}.conTable p{margin:6px 0}
 .conInput{width:78px;border:1px solid var(--line);border-radius:8px;padding:7px;font:inherit;text-align:right}
+/* Projetos mensais (clientes com consumo informado) */
+.conRes{overflow:auto;border-radius:var(--r);background:#fff;box-shadow:var(--sh);margin:16px 0 6px}
+.conRes table,.conMT table{width:100%;border-collapse:collapse}
+.conRes thead th,.conMT thead th{position:static;top:auto;z-index:auto;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:1px solid var(--line)}
+.conRes th,.conMT th{background:#f5f5f7;font-size:11px;font-weight:600;color:var(--mut);text-align:right;padding:10px 12px;white-space:normal;vertical-align:bottom}
+.conRes td,.conMT td{padding:12px;text-align:right;border-bottom:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap}
+.conRes td:first-child,.conRes th:first-child,.conMT td:first-child,.conMT th:first-child{text-align:left;white-space:normal}
+.conRes tbody tr{cursor:pointer}.conRes tbody tr:hover{background:#fafafc}.conRes tr.on{background:#f0f6ff}
+.conRes tr.tot td{font-weight:700;background:#f5f5f7;cursor:default}
+.conRes .sub,.conMT .sub{color:var(--mut);font-size:11px;font-weight:400;margin-top:2px}
+.conMT{overflow:auto;border-radius:var(--r);background:#fff;box-shadow:var(--sh)}
+.conMT table{min-width:1180px}
+.conMT th.gN,.conMT td.gN{background:rgba(0,113,227,.04)}.conMT th.gL,.conMT td.gL{background:rgba(52,199,89,.05)}
+.conMT th.gN{color:#0058b0}.conMT th.gL{color:#1d7a3a}
+.conMT .conInput{width:84px}
+.conMT details{font-size:11px;color:var(--mut);margin-top:6px;white-space:normal;line-height:1.6;max-width:320px}
+.conTag{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:999px;background:var(--na-bg);color:var(--na);margin:2px 4px 0 0;white-space:nowrap}
+.conTag.warn{background:var(--warn-bg);color:var(--warn)}.conTag.bad{background:var(--bad-bg);color:var(--bad)}
+.conResH{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:14px}.conResH h3{margin:0;font-size:17px}
+#conMNotes{font-size:12px;line-height:1.8;margin-top:16px}
 #conK .kpi b{font-size:26px}#conK{margin-top:18px}#conNotes{line-height:1.8;font-size:12px;margin-top:16px}#conProjection{margin-top:16px;font-size:13px;line-height:1.7}
 </style>
 </head>
@@ -527,17 +547,19 @@ tr.row.off .pn{font-weight:400}
   <!-- CONCORRÊNCIA: source orders, never inferred monthly consumption -->
   <section id="tab-concorrencia" class="hide">
     <div class="top"><div class="title"><h2>Concorrência</h2><div class="cond" id="conCond"></div></div></div>
+    <div id="conResumo"></div>
     <div class="conControls">
       <label>Cliente / concorrente<select class="sel" id="conClient" onchange="conClient(this.value)"></select></label>
-      <label>UF da simulação<select class="sel" id="conUf" onchange="CON.uf=this.value;renderCon()"></select></label>
-      <label>Pedidos iguais por mês (opcional)<input class="conInput" id="conFreq" inputmode="decimal" placeholder="Não informado" onchange="const n=num(this.value);if(this.value.trim()&&(n==null||!Number.isFinite(n)||n<=0)){toast('Frequência inválida',1);this.value=CON.freq}else{CON.freq=this.value;renderCon()}"></label>
+      <label>UF da simulação<select class="sel" id="conUf" onchange="conUfChange(this.value)"></select></label>
+      <label id="conFreqWrap">Pedidos iguais por mês (opcional)<input class="conInput" id="conFreq" inputmode="decimal" placeholder="Não informado" onchange="const n=num(this.value);if(this.value.trim()&&(n==null||!Number.isFinite(n)||n<=0)){toast('Frequência inválida',1);this.value=CON.freq}else{CON.freq=this.value;renderCon()}"></label>
       <button class="btn sec" id="conEdit" type="button" onclick="conEdit()">Editar pedido</button>
       <button class="btn hide" id="conSave" type="button" onclick="conSave()">Salvar pedido</button>
       <button class="link" type="button" onclick="conLoad(true)">Atualizar dados</button><span id="conStatus"></span>
     </div>
     <div id="conK" class="kpis"></div>
-    <div class="conTable"><table aria-label="Pedido concorrente versus Laben"><thead><tr><th>Produto Doremus</th><th>Embalagem</th><th>Vol.</th><th>kg</th><th>Doremus<br>R$/kg</th><th>Total<br>Doremus</th><th>Equivalente Laben</th><th>Laben<br>R$/kg</th><th>Diferença<br>R$ e %</th><th>CMV<br>R$/kg</th><th>Tabela no volume<br>Receita / margem</th><th>Empatar no volume<br>Receita / margem</th></tr></thead><tbody id="conBody"></tbody></table></div>
+    <div class="conTable" id="conPedTable"><table aria-label="Pedido concorrente versus Laben"><thead><tr><th>Produto Doremus</th><th>Embalagem</th><th>Vol.</th><th>kg</th><th>Doremus<br>R$/kg</th><th>Total<br>Doremus</th><th>Equivalente Laben</th><th>Laben<br>R$/kg</th><th>Diferença<br>R$ e %</th><th>CMV<br>R$/kg</th><th>Tabela no volume<br>Receita / margem</th><th>Empatar no volume<br>Receita / margem</th></tr></thead><tbody id="conBody"></tbody></table></div>
     <div class="card" id="conProjection"></div><div class="card" id="conNotes"></div>
+    <div id="conMWrap" class="hide"><div class="conMT"><table aria-label="Concorrente versus Laben por mês"><thead id="conMHead"></thead><tbody id="conMBody"></tbody></table></div><div class="card" id="conMNotes"></div></div>
   </section>
 
   <!-- PREÇOS -->
@@ -2625,11 +2647,11 @@ async function conLoad(force=false){
     const [c,i]=await Promise.all([sb.from('concorrencia_clientes').select('*').order('nome'),sb.from('concorrencia_itens').select('*').order('item_n')]);
     if(c.error||i.error||!c.data?.length)throw new Error(c.error?.message||i.error?.message||'Sem clientes acessíveis');
     CON.clientes=c.data;CON.itens=i.data||[];CON.fallback=false;CON.dirty={};CON.edit=false;
-    if(!CON.clientes.some(c=>c.id===CON.sel))CON.sel=(CON.clientes.find(c=>c.nome==='Alex')||CON.clientes[0]).id;
+    if(!CON.clientes.some(c=>c.id===CON.sel)){const c0=CON.clientes.find(c=>c.modo==='mensal')||CON.clientes.find(c=>c.nome==='Alex')||CON.clientes[0];CON.sel=c0.id;if(c0.modo==='mensal')CON.uf=c0.uf||'SP'}
   }catch(e){CON.fallback=true;console.warn('Concorrência: usando cópia da foto',e.message)}
   finally{CON.loaded=true;CON.loading=false;if(TAB==='concorrencia')renderCon()}
 }
-function conClient(id){if(Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?')){renderCon();return}CON.sel=id;CON.dirty={};CON.edit=false;CON.freq='';renderCon()}
+function conClient(id){if(Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?')){renderCon();return}CON.sel=id;CON.dirty={};CON.edit=false;CON.freq='';const c=CON.clientes.find(c=>c.id===id);if(c&&c.modo==='mensal')CON.uf=c.uf||'SP';renderCon()}
 function conEdit(){if(CON.edit&&Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?'))return;CON.edit=!CON.edit;CON.dirty={};renderCon()}
 function conChange(item,f,raw){const v=num(raw);if(v==null||!Number.isFinite(v)||v<0){toast('Informe um valor válido, maior ou igual a zero',1);renderCon();return}if(!CON.dirty[item])CON.dirty[item]={};CON.dirty[item][f]=v;renderCon()}
 async function conSave(){
@@ -2665,6 +2687,11 @@ function conSummary(rows){
 function renderCon(){
   if(!$('conBody'))return;
   const client=CON.clientes.find(c=>c.id===CON.sel)||CON.clientes[0];if(!client)return;
+  conResumo(client);
+  const mensal=client.modo==='mensal';
+  ['conK','conPedTable','conProjection','conNotes','conFreqWrap','conEdit'].forEach(id=>$(id)&&$(id).classList.toggle('hide',mensal));
+  $('conMWrap').classList.toggle('hide',!mensal);
+  if(mensal){renderConM(client);return}
   const e=EST.find(e=>e.uf===CON.uf),rows=conRows().map(i=>conItem(i,e)),s=conSummary(rows);
   $('conClient').innerHTML=CON.clientes.map(c=>`<option value="${esc(c.id)}" ${c.id===client.id?'selected':''}>${esc(c.nome)} · ${esc(c.concorrente)}</option>`).join('');
   $('conUf').innerHTML=EST.map(e=>`<option value="${esc(e.uf)}" ${e.uf===CON.uf?'selected':''}>${esc(e.uf)} · ${esc(e.nome)}</option>`).join('');
@@ -2673,7 +2700,7 @@ function renderCon(){
   $('conSave').classList.toggle('hide',!CON.edit);$('conSave').disabled=CON.saving||!Object.keys(CON.dirty).length;
   $('conStatus').textContent=CON.loading?'Carregando…':CON.fallback?'Cópia de segurança da foto · edição indisponível até conectar os dados':'Salvo no painel · '+rows.length+' itens'+(Object.keys(CON.dirty).length?' · alterações não salvas':'');
   const eff=e?Object.assign({},e,AN[e.uf]||{}):null;
-  $('conCond').innerHTML=`<b>${esc(client.nome)} · ${esc(client.segmento)} · ${esc(client.concorrente)}</b> · UF do cliente: ${client.uf?esc(client.uf):'não informada'} · Simulação: <b>LBR · Simples Nacional · ${esc(CON.uf)}</b><br>Simples ${pct0(lbrAliq())} + frete ${pct0(eff?.frete_pct==null?null:Number(eff.frete_pct))} + comissão ${pct0(Number(eff?.comissao_pct)||0)} + degustação ${pct0(Number(eff?.degustacao_pct)||0)}. ICMS/PIS/COFINS da LBR: 0%. ${rows.some(r=>r.carga!=null)?'Carga total nos itens: '+[...new Set(rows.filter(r=>r.carga!=null).map(r=>pct0(r.carga)))].join(' / ')+'.':''} ${!e||lbrAliq()==null?'<strong class="c-warn">Sem cadastro tributário completo: margem indisponível.</strong>':''}`;
+  $('conCond').innerHTML=`<b>${esc(client.nome)}${client.segmento?' · '+esc(client.segmento):''} · ${esc(client.concorrente)}</b> · UF do cliente: ${client.uf?esc(client.uf):'não informada'} · Simulação: <b>LBR · Simples Nacional · ${esc(CON.uf)}</b><br>Simples ${pct0(lbrAliq())} + frete ${pct0(eff?.frete_pct==null?null:Number(eff.frete_pct))} + comissão ${pct0(Number(eff?.comissao_pct)||0)} + degustação ${pct0(Number(eff?.degustacao_pct)||0)}. ICMS/PIS/COFINS da LBR: 0%. ${rows.some(r=>r.carga!=null)?'Carga total nos itens: '+[...new Set(rows.filter(r=>r.carga!=null).map(r=>pct0(r.carga)))].join(' / ')+'.':''} ${!e||lbrAliq()==null?'<strong class="c-warn">Sem cadastro tributário completo: margem indisponível.</strong>':''}`;
   const part=s.partial?'Margem parcial conhecida':'Margem empresa';
   $('conK').innerHTML=`<div class="kpi"><span>Volume deste pedido</span><b>${conNum(s.kg)} kg</b><small>${brl(s.total)} na ${esc(client.concorrente)} · ticket ${brl(s.kg?s.total/s.kg:null)}/kg</small></div>
     <div class="kpi"><span>Com equivalente de sabor · ${s.matched} itens</span><b>${conNum(s.matchedKg)} kg</b><small>${brl(s.matchedTotal)} na concorrência</small><small>Sem par: ${conNum(s.kg-s.matchedKg)} kg · ${brl(s.total-s.matchedTotal)}</small></div>
@@ -2692,6 +2719,117 @@ function renderCon(){
   $('conNotes').innerHTML=`<b>Volume = este pedido. Não é consumo mensal.</b> Total calculado por kg × R$/kg (sem arredondar as linhas antes de somar). Todos os itens são Doremus. Preços comparados por kg, sem supor rendimento idêntico; validar aplicação, textura e embalagem.<br><b class="c-warn">Item 14 · Doremax Leitinho:</b> foto informa 10 kg; embalagem 6×4 kg corresponderia a 24 kg/volume. Mantidos os 10 kg da fonte, a confirmar.<br>Morango: preço comparável, mas sem CMV — nenhuma margem foi atribuída; os cards mostram a soma parcial apenas de itens com CMV (${s.known}/${s.matched}). Margem por dentro = receita × (1 − carga total) − CMV do volume. Receita teórica em kg equivalentes, sem arredondar para potes/caixas fechadas. Frete por produto/UF é respeitado quando cadastrado.<br><details><summary>Fonte e ressalvas</summary><p>${esc(client.fonte)}. Data de referência da fonte: ${esc(client.data_ref)} (não é data confirmada do pedido).</p><p>${esc(client.obs)}</p><p>O ICMS de 18% e o PIS de 1,65% são os da cotação Doremus; não entram como tributos da LBR. COFINS cortada no “7”: armazenada como nula. Total ICMS-ST visível: R$ 0,00. “Pagto Antecipado” está cortado.</p></details>`;
   const freq=num(CON.freq);
   $('conProjection').innerHTML=freq!=null&&freq>0?`<b>Projeção hipotética · ${conNum(freq)} pedido(s) iguais por mês</b><p>${conNum(s.matchedKg*freq)} kg substituíveis/mês · Tabela: receita ${brl(s.revenue==null?null:s.revenue*freq)} e margem ${s.partial?'parcial ':''}${brl(s.margin==null?null:s.margin*freq)} · Empate: receita ${brl(s.matchRevenue==null?null:s.matchRevenue*freq)} e margem ${s.partial?'parcial ':''}${brl(s.matchMargin==null?null:s.matchMargin*freq)}.</p><span class="muted">Somente hipótese informada neste campo; frequência de compra ainda não confirmada.</span>`:'Sem frequência informada: os potenciais acima são de um único pedido.';
+}
+
+/* ---------- Concorrência: projetos mensais (consumo informado pelo cliente) ----------
+   Mesmas fórmulas do painel (calc): tudo por dentro, carga do estado do cliente.
+   Nutríssima = Lucro Real (ICMS + PIS + COFINS do cadastro do estado); LBR = Simples (alíquota da aba Empresa). */
+const CON_EMP={nutrissima:'Nutríssima · Lucro Real',lbr:'LBR · Simples'};
+function conKgOf(p){const m=String(p&&p.embalagem||'').match(/([\d.,]+)\s*kg/i);return m?Number(m[1].replace(',','.')):null}
+function conCarga(c){return c==null||c.semSimples?null:(c.imPct||0)+(c.pisPct||0)+(c.cofPct||0)+(c.frPct||0)+(c.cd||0)}
+function conMItem(i,uf){
+  const p=conProduct(i),e=EST.find(x=>x.uf===uf),kgU=conKgOf(p)||3;
+  const comp=i.preco_unit==null?null:Number(i.preco_unit),kg=Number(i.qtde)||0,b=kg/kgU;
+  const o={i,p,e,uf,kgU,comp,compKg:comp==null?null:comp/kgU,kg,b,ref:i.preco_fonte!=='cliente',noVol:!kg};
+  if(!p||!e)return o;
+  const r=preRow(uf,p.id)||{};o.r=r;
+  const t=precoFaixa(r,1,p);o.tab=t==null?null:Number(t);o.tabKg=o.tab==null?null:o.tab/kgU;
+  if(comp!=null&&o.tab!=null){o.gap=o.tab-comp;o.gapPct=comp?o.gap/comp:null}
+  o.cmv=cmvOf(p.chave_cmv);
+  o.carN=conCarga(calc(p,r,e,1,100,'nutrissima'));o.carL=conCarga(calc(p,r,e,1,100,'lbr'));
+  const piso=c=>c==null||o.cmv==null||1-c-ORC_MIN/10<=0?null:Math.ceil(o.cmv/(1-c-ORC_MIN/10)*10)/10;
+  o.pisoN=piso(o.carN);o.pisoL=piso(o.carL);
+  let sug=o.tab,why=o.ref?'Sem preço real do concorrente: usa o preço de tabela '+uf+'.':'Preço de tabela '+uf+'.';
+  if(!o.ref&&comp!=null&&o.tab!=null){
+    const cand=Math.min(o.tab,Math.floor((comp-1)*10)/10);
+    sug=cand;why=cand===o.tab?'A tabela '+uf+' já fica abaixo do concorrente.':'R$ 1,00 abaixo do preço do concorrente.';
+    if(o.pisoL!=null&&cand<o.pisoL){sug=o.pisoL;o.semSaida=true;why='Abaixo do concorrente não há margem saudável: sugerido o piso da LBR (índice '+ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})+'), acima do preço do concorrente.'}
+  }
+  o.sug=sug;o.why=why;o.propManual=i.proposta_unit!=null;o.prop=o.propManual?Number(i.proposta_unit):sug;
+  if(o.prop!=null){
+    o.N=calc(p,r,e,1,o.prop,'nutrissima');o.L=calc(p,r,e,1,o.prop,'lbr');
+    o.rev=o.prop*b;o.mN=o.N.m==null?null:o.N.m*b;o.mL=o.L.m==null?null:o.L.m*b;
+    if(comp!=null){o.pGap=o.prop-comp;o.pGapPct=comp?o.pGap/comp:null}
+    const ch=p.chave_cmv==='AVELA|3KG'?PROD.find(x=>x.chave_cmv==='AVELA_CHEF|3KG'):null;
+    if(ch){const rc=preRow(uf,ch.id)||{};o.chef={p:ch,N:calc(ch,rc,e,1,o.prop,'nutrissima'),L:calc(ch,rc,e,1,o.prop,'lbr')}}
+  }
+  return o;
+}
+function conMClient(c){
+  const uf=c.uf||'SP';
+  const rows=CON.itens.filter(i=>i.cliente_id===c.id).map(i=>c.id===CON.sel?{...i,...CON.dirty[i.item_n]}:i).sort((a,b)=>a.item_n-b.item_n).map(i=>conMItem(i,uf));
+  const sum=f=>rows.reduce((s,r)=>s+(Number(r[f])||0),0),all=f=>rows.every(r=>r[f]!=null);
+  const rev=sum('rev'),mN=all('mN')?sum('mN'):null,mL=all('mL')?sum('mL'):null;
+  return {c,uf,rows,kg:sum('kg'),b:sum('b'),rev,mN,mL,pN:rev&&mN!=null?mN/rev:null,pL:rev&&mL!=null?mL/rev:null,noVol:rows.some(r=>r.noVol)};
+}
+const conBal=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1});
+function conPill(mp){if(mp==null)return '<span class="pill na">—</span>';const v=mp*10;return `<span class="pill ${v<0?'bad':v<ORC_MIN?'warn':'ok'}">${idx(mp)}</span>`}
+function conTags(a){return (a||[]).map(t=>`<span class="conTag ${/conferir/i.test(t)?'bad':'warn'}">${esc(t)}</span>`).join('')}
+function conMoney(m,p){return m==null?'—':`<strong class="${m<0?'c-bad':''}">${brl(m)}</strong><div class="sub">${pct(p)} da receita</div>`}
+function conResumo(sel){
+  const M=CON.clientes.filter(c=>c.modo==='mensal');
+  if(!M.length){$('conResumo').innerHTML='';return}
+  const S=M.map(conMClient),T={kg:0,b:0,rev:0,mN:0,mL:0};
+  S.forEach(s=>{T.kg+=s.kg;T.b+=s.b;T.rev+=s.rev||0;T.mN+=s.mN||0;T.mL+=s.mL||0});
+  const ped=CON.clientes.filter(c=>c.modo!=='mensal');
+  $('conResumo').innerHTML=`<div class="conResH"><h3>Tamanho dos projetos · por mês</h3><span class="muted" style="font-size:12px">Volume × proposta, na carga do estado de cada cliente. Clique num cliente para abrir.</span></div>
+  <div class="conRes"><table aria-label="Resumo mensal por cliente"><thead><tr><th>Cliente · concorrente</th><th>UF</th><th>Volume/mês</th><th>Faturamento/mês<br>(proposta)</th><th style="color:#0058b0">Margem/mês<br>Nutríssima · Lucro Real</th><th style="color:#1d7a3a">Margem/mês<br>LBR · Simples</th><th>Diferença<br>LBR − Nutríssima</th></tr></thead><tbody>
+  ${S.map(s=>`<tr class="${s.c.id===sel.id?'on':''}" onclick="conClient('${esc(s.c.id)}')"><td><strong>${esc(s.c.nome)}</strong><div class="sub">${esc(s.c.concorrente)}</div>${conTags(s.c.alertas)}</td><td>${esc(s.uf)}</td>
+    <td>${s.noVol&&!s.kg?'<span class="c-warn">a informar</span>':`<strong>${conNum(s.kg)} kg</strong><div class="sub">${conBal(s.b)} baldes</div>`}</td>
+    <td>${s.kg?`<strong>${brl(s.rev)}</strong>`:'—'}</td><td>${s.kg?conMoney(s.mN,s.pN):'—'}</td><td>${s.kg?conMoney(s.mL,s.pL):'—'}</td><td>${s.kg&&s.mN!=null&&s.mL!=null?brl(s.mL-s.mN):'—'}</td></tr>`).join('')}
+  <tr class="tot"><td>Total geral · ${S.length} clientes</td><td></td><td>${conNum(T.kg)} kg<div class="sub">${conBal(T.b)} baldes</div></td><td>${brl(T.rev)}</td><td>${brl(T.mN)}<div class="sub">${pct(T.rev?T.mN/T.rev:null)}</div></td><td>${brl(T.mL)}<div class="sub">${pct(T.rev?T.mL/T.rev:null)}</div></td><td>${brl(T.mL-T.mN)}</td></tr></tbody></table></div>
+  ${ped.length?`<div class="muted" style="font-size:12px;margin:0 0 6px">Fora do total mensal: ${ped.map(c=>`<a href="#" onclick="conClient('${esc(c.id)}');return false">${esc(c.nome)} · ${esc(c.concorrente)}</a>`).join(', ')} (pedido único, sem frequência confirmada).</div>`:''}`;
+}
+async function conUfChange(v){
+  const c=CON.clientes.find(c=>c.id===CON.sel);CON.uf=v;
+  if(c&&c.modo==='mensal'&&!CON.fallback&&c.uf!==v){
+    const al=(c.alertas||[]).filter(a=>!/^UF não informada/.test(a));
+    const {error}=await sb.from('concorrencia_clientes').update({uf:v,alertas:al,updated_at:new Date().toISOString()}).eq('id',c.id);
+    if(error)toast('Não foi possível salvar a UF: '+error.message,1);else{c.uf=v;c.alertas=al;toast('UF de '+c.nome+' salva: '+v)}
+  }
+  renderCon();
+}
+function conMChange(n,f,raw){
+  if(!CON.dirty[n])CON.dirty[n]={};
+  if(f==='proposta_unit'&&!String(raw).trim()){CON.dirty[n].proposta_unit=null;renderCon();return}
+  const v=num(raw);if(v==null||!Number.isFinite(v)||v<0){toast('Informe um valor válido, maior ou igual a zero',1);renderCon();return}
+  const it=CON.itens.find(i=>i.cliente_id===CON.sel&&i.item_n===n),kgU=conKgOf(conProduct(it||{}))||3;
+  if(f==='baldes'){CON.dirty[n].volumes=Math.round(v*10000)/10000;CON.dirty[n].qtde=Math.round(v*kgU*10000)/10000}
+  else if(f==='kg'){CON.dirty[n].qtde=v;CON.dirty[n].volumes=Math.round(v/kgU*10000)/10000}
+  else CON.dirty[n][f]=v;
+  renderCon();
+}
+function renderConM(client){
+  const s=conMClient(client),uf=s.uf,e=EST.find(x=>x.uf===uf);
+  $('conClient').innerHTML=CON.clientes.map(c=>`<option value="${esc(c.id)}" ${c.id===client.id?'selected':''}>${esc(c.nome)} · ${esc(c.concorrente)}</option>`).join('');
+  $('conUf').innerHTML=EST.map(x=>`<option value="${esc(x.uf)}" ${x.uf===uf?'selected':''}>${esc(x.uf)} · ${esc(x.nome)}</option>`).join('');
+  const dirty=Object.keys(CON.dirty).length;
+  $('conSave').classList.toggle('hide',!dirty);$('conSave').disabled=CON.saving||!dirty;$('conSave').textContent='Salvar alterações';
+  $('conStatus').textContent=CON.loading?'Carregando…':'Salvo no painel · consumo mensal'+(dirty?' · alterações não salvas':'');
+  const r0=s.rows.find(r=>r.N)||{},N=r0.N,L=r0.L;
+  const comp=x=>x==null?'—':pct0(x);
+  $('conCond').innerHTML=`<b>${esc(client.nome)} · compra de ${esc(client.concorrente)} · UF ${esc(uf)}</b> ${conTags(client.alertas)}<br>
+   <span style="color:#0058b0">Nutríssima · Lucro Real</span>: ICMS ${comp(N?.imPct)} + PIS ${comp(N?.pisPct)} + COFINS ${comp(N?.cofPct)} + frete ${comp(N?.frPct)} + comissão/degustação ${comp(N?.cd)} = <b>${comp(conCarga(N))}</b> por dentro ·
+   <span style="color:#1d7a3a">LBR · Simples</span>: Simples ${comp(L?.imPct)} + frete ${comp(L?.frPct)} + comissão/degustação ${comp(L?.cd)} = <b>${comp(conCarga(L))}</b> por dentro`;
+  const inp=(n,f,v,lab)=>`<input class="conInput" aria-label="${esc(lab)}" inputmode="decimal" value="${v==null?'':esc(fmtIn(v))}" onchange="conMChange(${n},'${f}',this.value)" ${CON.saving?'disabled':''}>`;
+  const mg=(c,b)=>!c||c.m==null?'—':`<strong class="${c.m<0?'c-bad':''}">${brl(c.m)}</strong><div class="sub">por balde · ${pct(c.mp)}</div><div style="margin-top:4px">${conPill(c.mp)}</div>`;
+  $('conMHead').innerHTML=`<tr><th>Produto do concorrente<br>→ equivalente Laben</th><th>Volume/mês</th><th>Concorrente<br>R$/balde · R$/kg</th><th>Laben tabela ${esc(uf)}<br>R$/balde · R$/kg</th><th>Diferença<br>tabela − concorrente</th><th>Proposta<br>R$/balde (editável)</th><th class="gN">Margem<br>Nutríssima · Lucro Real</th><th class="gL">Margem<br>LBR · Simples</th><th>No mês<br>faturamento · margem</th></tr>`;
+  $('conMBody').innerHTML=s.rows.map(r=>{const i=r.i,n=i.item_n;return `<tr>
+    <td><strong>${esc(i.produto)}</strong>${conTags(i.alertas)}<div class="sub">→ ${r.p?esc(nice(r.p.descricao))+' · cód. '+esc(r.p.codigo||'—'):'<span class="c-warn">equivalente não carregado</span>'}</div>
+      <details><summary>Detalhes e alternativa</summary><p>${esc(i.match_obs||'')}</p><p>CMV ${brl(r.cmv)}/balde · sugestão: ${brl(r.sug)} — ${esc(r.why||'')}</p><p>Piso índice ${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}: Nutríssima ${brl(r.pisoN)} · LBR ${brl(r.pisoL)} por balde.</p>${r.chef?`<p><b>Alternativa Linha Chef 3 kg (só análise, ${esc(r.chef.p.codigo)}):</b> CMV ${brl(cmvOf(r.chef.p.chave_cmv))} · margem na proposta: Nutríssima ${brl(r.chef.N.m)} (${pct(r.chef.N.mp)}) · LBR ${brl(r.chef.L.m)} (${pct(r.chef.L.mp)}) por balde.</p>`:''}</details></td>
+    <td>${inp(n,'baldes',r.b?Math.round(r.b*10)/10:null,'Baldes por mês')} <span class="sub">baldes</span><div class="sub">${r.noVol?'<span class="c-warn">volume a informar</span>':conNum(r.kg)+' kg'}</div></td>
+    <td>${inp(n,'preco_unit',r.comp,'Preço do concorrente por balde')}<div class="sub">${brl(r.compKg)}/kg</div><div class="sub">${r.ref?'<span class="c-warn">referência Doremus · cliente SP</span>':'informado pelo cliente'}</div></td>
+    <td><strong>${brl(r.tab)}</strong><div class="sub">${brl(r.tabKg)}/kg</div></td>
+    <td class="${r.gap==null?'':r.gap>0?'c-bad':'c-ok'}"><strong>${r.gap==null?'—':(r.gap>0?'+':'')+brl(r.gap)}</strong><div class="sub">${r.gap==null?'':(r.gap>0?'+':'')+pct(r.gapPct)} · ${r.gap==null?'':r.gap>0?'Laben mais cara':'Laben mais barata'}</div></td>
+    <td>${inp(n,'proposta_unit',r.prop,'Proposta por balde')}<div class="sub">${brl(r.prop==null?null:r.prop/r.kgU)}/kg</div><div class="sub ${r.pGap>0?'c-bad':'c-ok'}">${r.pGap==null?'':(r.pGap>0?'+':'')+brl(r.pGap)+' ('+(r.pGap>0?'+':'')+pct(r.pGapPct)+') vs concorrente'}</div><div class="sub">${r.propManual?'<a href="#" onclick="conMChange('+n+',\'proposta_unit\',\'\');return false">usar sugestão</a>':'sugestão automática'}</div></td>
+    <td class="gN">${mg(r.N)}</td><td class="gL">${mg(r.L)}</td>
+    <td>${r.kg?`<strong>${brl(r.rev)}</strong><div class="sub" style="color:#0058b0">Nutríssima ${brl(r.mN)}</div><div class="sub" style="color:#1d7a3a">LBR ${brl(r.mL)}</div>`:'<span class="c-warn">volume a informar</span>'}</td></tr>`}).join('')+
+    (s.rows.length>1?`<tr class="tot"><td><strong>Total ${esc(client.nome)}</strong></td><td><strong>${conBal(s.b)} baldes</strong><div class="sub">${conNum(s.kg)} kg</div></td><td colspan="4"></td><td class="gN">${conMoney(s.mN,s.pN)}<div class="sub">no mês</div></td><td class="gL">${conMoney(s.mL,s.pL)}<div class="sub">no mês</div></td><td><strong>${brl(s.rev)}</strong></td></tr>`:'');
+  const best=s.mN!=null&&s.mL!=null?(s.mL>=s.mN?'LBR':'Nutríssima'):null;
+  $('conMNotes').innerHTML=`${best&&s.kg?(Math.abs(s.mL-s.mN)<0.005?'<b>Com a carga atual deste estado, Nutríssima e LBR deixam a mesma margem.</b><br>':`<b>Faturando pela ${best} sobra mais: ${brl(Math.abs(s.mL-s.mN))}/mês a mais.</b><br>`):''}
+   Margem = proposta − CMV − proposta × carga do estado (${esc(uf)}), por dentro. Índice = margem × 10 (5,0 = 50%); verde a partir de ${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}, o mesmo mínimo do Orçamento. Cliente B2B contribuinte de ICMS, sem DIFAL.<br>
+   Sugestão de proposta: se o preço do concorrente foi informado, o maior preço R$ 1,00 abaixo dele (limitado à tabela), desde que a LBR fique no índice mínimo; sem preço real, a tabela do estado. Altere à vontade e clique em <b>Salvar alterações</b>. Produtos e CMVs não são alterados aqui.<br>
+   <details><summary>Fonte e premissas</summary><p>${esc(client.fonte||'')} · ${esc(client.obs||'')}</p></details>`;
 }
 
 /* ---------- navegação mobile ---------- */
