@@ -529,6 +529,15 @@ tr.row.off .pn{font-weight:400}
 .conSimA{display:grid;gap:6px;justify-items:start}.conSimX{grid-column:1/-1;font-size:11px;color:var(--mut);line-height:1.6}
 @media(max-width:900px){.conSim{grid-template-columns:1fr}}
 #conForm{margin-top:16px}
+.conPRows{display:grid;gap:8px}
+.conPRow{display:grid;grid-template-columns:2fr 1.3fr 1fr .8fr 1fr auto;gap:10px;align-items:end;padding:10px 12px;border-radius:12px;background:#fafafc;box-shadow:inset 0 0 0 1px var(--line)}
+.conPRow label{font-size:12px;color:var(--mut);display:grid;gap:5px}.conPRow .w2{grid-column:auto}
+.conPRow input{border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;color:var(--ink);background:#fff;min-width:0}
+.conPRow .sel{width:100%}
+.conRm{font-size:11px;color:var(--mut2)!important;margin-top:4px}.conRm:hover{color:var(--bad)!important}
+.conPSel select{border:0;background:transparent;font:inherit;font-size:11px;color:var(--mut);max-width:230px;padding:0;cursor:pointer}
+.conPSel select:hover{color:var(--acc)}
+@media(max-width:820px){.conPRow{grid-template-columns:1fr 1fr}}
 .conFormGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .conFormGrid label{font-size:12px;color:var(--mut);display:grid;gap:5px}.conFormGrid .w2{grid-column:span 2}
 .conFormGrid input{border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;color:var(--ink);background:#fff}
@@ -580,7 +589,7 @@ tr.row.off .pn{font-weight:400}
     <div id="conK" class="kpis"></div>
     <div class="conTable" id="conPedTable"><table aria-label="Pedido concorrente versus Laben"><thead><tr><th>Produto Doremus</th><th>Embalagem</th><th>Vol.</th><th>kg</th><th>Doremus<br>R$/kg</th><th>Total<br>Doremus</th><th>Equivalente Laben</th><th>Laben<br>R$/kg</th><th>Diferença<br>R$ e %</th><th>CMV<br>R$/kg</th><th>Tabela no volume<br>Receita / margem</th><th>Empatar no volume<br>Receita / margem</th></tr></thead><tbody id="conBody"></tbody></table></div>
     <div class="card" id="conProjection"></div><div class="card" id="conNotes"></div>
-    <div id="conMWrap" class="hide"><div class="conMT"><table aria-label="Concorrente versus Laben por mês"><thead id="conMHead"></thead><tbody id="conMBody"></tbody></table></div><div class="card" id="conMNotes"></div></div>
+    <div id="conMWrap" class="hide"><div class="conMT"><table aria-label="Concorrente versus Laben por mês"><thead id="conMHead"></thead><tbody id="conMBody"></tbody></table></div><div id="conAdd"></div><div class="card" id="conMNotes"></div></div>
   </section>
 
   <!-- PREÇOS -->
@@ -2673,7 +2682,7 @@ async function conLoad(force=false){
   }catch(e){CON.fallback=true;console.warn('Concorrência: usando cópia da foto',e.message)}
   finally{CON.loaded=true;CON.loading=false;if(TAB==='concorrencia')renderCon()}
 }
-function conClient(id){if(Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?')){renderCon();return}CON.sel=id;CON.dirty={};CON.edit=false;CON.freq='';const c=CON.clientes.find(c=>c.id===id);if(c&&c.modo==='mensal')CON.uf=c.uf||'SP';renderCon()}
+function conClient(id){if(Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?')){renderCon();return}CON.sel=id;CON.dirty={};CON.edit=false;CON.freq='';CON.add=false;const c=CON.clientes.find(c=>c.id===id);if(c&&c.modo==='mensal')CON.uf=c.uf||'SP';renderCon()}
 function conEdit(){if(CON.edit&&Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas?'))return;CON.edit=!CON.edit;CON.dirty={};renderCon()}
 function conChange(item,f,raw){const v=num(raw);if(v==null||!Number.isFinite(v)||v<0){toast('Informe um valor válido, maior ou igual a zero',1);renderCon();return}if(!CON.dirty[item])CON.dirty[item]={};CON.dirty[item][f]=v;renderCon()}
 async function conSave(){
@@ -2889,48 +2898,97 @@ function conPipeHtml(){
   <div class="muted" style="font-size:12px;margin:4px 0 14px">Preço mínimo = R$/balde para o índice ${conIdxMin()} com a carga do estado de cada cliente (média ponderada pelo volume; abaixo, a faixa entre produtos). Porte pelo volume mensal em baldes.</div>
   <h3 class="conH3">Clientes · etapa, probabilidade e segmento</h3><div class="conRes conPipe"><table><thead><tr><th>Cliente</th><th>Segmento</th><th>Etapa</th><th>Probab.</th><th>Porte</th><th>Baldes/mês</th><th>Faturamento/mês</th><th>CMV/mês</th><th class="gN">Margem/mês Nutríssima</th><th class="gL">Margem/mês LBR</th></tr></thead><tbody>${lista}</tbody></table></div>`;
 }
-/* ----- + Novo cliente ----- */
-function conFormOpen(){CON.form=true;renderConForm();$('conForm').scrollIntoView({behavior:'smooth',block:'start'})}
+/* ----- + Novo cliente (vários produtos) e + Produto em cliente existente ----- */
+function conProdList(cur){const L=PROD.filter(p=>p.chave_cmv&&(conKgOf(p)||0)>=3).sort((a,b)=>(conKgOf(a)-conKgOf(b))||String(a.descricao).localeCompare(b.descricao));if(cur&&!L.includes(cur))L.unshift(cur);return L}
+function conProdOpts(selId){const def=selId||(PROD.find(p=>p.codigo==='1164')||{}).id;return conProdList(PROD.find(p=>p.id===selId)).map(p=>`<option value="${esc(p.id)}" ${p.id===def?'selected':''}>${esc(nice(p.descricao))}${p.codigo?' · '+esc(p.codigo):''}</option>`).join('')}
+const CON_UN={bm:'baldes/mês',bd:'baldes/dia',kg:'kg/mês'};
+function conPRowHtml(k,r,rm){r=r||{};return `<div class="conPRow" data-k="${k}">
+  <label class="w2">Produto Laben equivalente<select class="sel" data-f="prod">${conProdOpts(r.prod)}</select></label>
+  <label>Produto do concorrente (opcional)<input data-f="prodC" value="${esc(r.prodC||'')}" placeholder="Ex.: Avelã Carino"></label>
+  <label>Preço pago/balde (opcional)<input data-f="preco" inputmode="decimal" value="${esc(r.preco||'')}" placeholder="R$"></label>
+  <label>Volume<input data-f="vol" inputmode="decimal" value="${esc(r.vol||'')}" placeholder="Ex.: 20"></label>
+  <label>Unidade<select class="sel" data-f="un">${Object.entries(CON_UN).map(([v,l])=>`<option value="${v}" ${r.un===v?'selected':''}>${l}</option>`).join('')}</select></label>
+  ${rm?`<button class="link conRm" type="button" title="Remover produto" aria-label="Remover produto" onclick="${rm}">Remover</button>`:'<span></span>'}</div>`}
+function conPRowsRead(box){return [...box.querySelectorAll('.conPRow')].map(el=>{const o={};el.querySelectorAll('[data-f]').forEach(x=>o[x.dataset.f]=x.value.trim());return o})}
+/* valida e converte uma linha de produto em item */
+function conPRowItem(r,conc){
+  const p=PROD.find(x=>x.id===r.prod);if(!p)return {err:'Escolha o produto Laben'};
+  const vol=num(r.vol),preco=r.preco?num(r.preco):null;
+  if(vol==null||!Number.isFinite(vol)||vol<0)return {err:'Volume inválido em '+nice(p.descricao)};
+  if(preco!=null&&(!Number.isFinite(preco)||preco<=0))return {err:'Preço inválido em '+nice(p.descricao)};
+  const kgU=conKgOf(p)||3,baldes=r.un==='bm'?vol:r.un==='bd'?vol*CON_CFG.dias_mes:vol/kgU,kg=baldes*kgU;
+  const al=[];if(preco==null)al.push('Preço não informado');if(!vol)al.push('Volume a informar');
+  return {p,vol,un:r.un,it:{produto:r.prodC||(conc+' · '+nice(p.descricao)),embalagem:`Balde ${fmtIn(kgU)} kg`,um:'BALDE',qtde:Math.round(kg*10000)/10000,volumes:Math.round(baldes*10000)/10000,preco_unit:preco,nosso_codigo:p.codigo||null,nosso_chave_cmv:p.chave_cmv,preco_fonte:preco==null?null:'cliente',alertas:al.length?al:null,match_obs:`Cadastrado no painel em ${new Date().toLocaleDateString('pt-BR')}: ${fmtIn(vol)} ${CON_UN[r.un]}${r.un==='bd'?' (× '+fmtIn(CON_CFG.dias_mes)+' dias/mês)':''}.`}};
+}
+function conFormOpen(){CON.form=true;CON.fRows=[{}];const f=$('conForm');f.dataset.r='';renderConForm();f.scrollIntoView({behavior:'smooth',block:'start'})}
 function conFormClose(){CON.form=false;renderConForm()}
+function conFormRows(){const box=$('nfRows');if(!box)return;box.innerHTML=CON.fRows.map((r,k)=>conPRowHtml(k,r,CON.fRows.length>1?`conFormDel(${k})`:'')).join('')}
+function conFormAdd(){CON.fRows=conPRowsRead($('nfRows'));CON.fRows.push({});conFormRows()}
+function conFormDel(k){CON.fRows=conPRowsRead($('nfRows'));CON.fRows.splice(k,1);if(!CON.fRows.length)CON.fRows=[{}];conFormRows()}
 function renderConForm(){
-  const f=$('conForm');if(!f)return;f.classList.toggle('hide',!CON.form);if(!CON.form){f.innerHTML='';return}
-  const prods=PROD.filter(p=>p.chave_cmv&&(conKgOf(p)||0)>=3).sort((a,b)=>(conKgOf(a)-conKgOf(b))||String(a.descricao).localeCompare(b.descricao));
-  const def=prods.find(p=>p.codigo==='1164');
+  const f=$('conForm');if(!f)return;f.classList.toggle('hide',!CON.form);if(!CON.form){f.innerHTML='';f.dataset.r='';return}
+  if(f.dataset.r==='1')return; /* não apaga o que já foi digitado */
+  f.dataset.r='1';
   f.innerHTML=`<div class="conResH" style="margin:0 0 12px"><h3>Novo cliente</h3><button class="link" type="button" onclick="conFormClose()">Fechar</button></div>
   <div class="conFormGrid">
-    <label>Nome<input class="inp" id="nfNome" placeholder="Ex.: Pipocas da Ana"></label>
+    <label>Nome<input id="nfNome" placeholder="Ex.: Pipocas da Ana"></label>
     <label>Segmento<select class="sel" id="nfSeg"><option value="">não informado</option>${conOpts(CON_SEGS,'')}</select></label>
     <label>UF<select class="sel" id="nfUf">${EST.map(e=>`<option value="${esc(e.uf)}" ${e.uf==='SP'?'selected':''}>${esc(e.uf)} · ${esc(e.nome)}</option>`).join('')}</select></label>
-    <label>Concorrente<input class="inp" id="nfConc" placeholder="Ex.: Carino"></label>
-    <label class="w2">Produto Laben equivalente<select class="sel" id="nfProd">${prods.map(p=>`<option value="${esc(p.id)}" ${p===def?'selected':''}>${esc(nice(p.descricao))}${p.codigo?' · '+esc(p.codigo):''}</option>`).join('')}</select></label>
-    <label>Produto do concorrente (opcional)<input class="inp" id="nfProdC" placeholder="Ex.: Avelã Carino"></label>
-    <label>Preço pago por balde (opcional)<input class="inp" id="nfPreco" inputmode="decimal" placeholder="R$"></label>
-    <label>Volume<input class="inp" id="nfVol" inputmode="decimal" placeholder="Ex.: 20"></label>
-    <label>Unidade<select class="sel" id="nfUn"><option value="bm">baldes/mês</option><option value="bd">baldes/dia</option><option value="kg">kg/mês</option></select></label>
+    <label>Concorrente<input id="nfConc" placeholder="Ex.: Carino"></label>
     <label>Etapa<select class="sel" id="nfEt">${conOpts(CON_ETAPAS.map(x=>x[0]),'Prospecção')}</select></label>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" type="button" id="nfSave" onclick="conFormSave()">Salvar cliente</button><span class="muted" style="font-size:12px">Baldes/dia × ${fmtIn(CON_CFG.dias_mes)} dias = baldes/mês. Sem preço, a proposta começa na tabela do estado.</span></div>`;
+  <div class="conH3" style="margin:16px 0 6px;font-weight:600">Produtos</div>
+  <div id="nfRows" class="conPRows"></div>
+  <button class="link" type="button" style="margin-top:8px" onclick="conFormAdd()">+ Adicionar produto</button>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" type="button" id="nfSave" onclick="conFormSave()">Salvar cliente</button><span class="muted" style="font-size:12px">Baldes/dia × ${fmtIn(CON_CFG.dias_mes)} dias = baldes/mês. Sem preço, a proposta começa na tabela do estado. O porte usa a soma dos baldes/mês de todos os produtos.</span></div>`;
+  conFormRows();
 }
 async function conFormSave(){
   if(CON.fallback){toast('Dados não conectados: recarregue a página',1);return}
-  const g=id=>$(id).value.trim(),nome=g('nfNome'),conc=g('nfConc'),p=PROD.find(x=>x.id===$('nfProd').value);
-  const vol=num(g('nfVol')),preco=g('nfPreco')?num(g('nfPreco')):null,un=$('nfUn').value;
-  if(!nome||!conc||!p){toast('Informe nome, concorrente e produto',1);return}
-  if(vol==null||!Number.isFinite(vol)||vol<0){toast('Volume inválido',1);return}
-  if(preco!=null&&(!Number.isFinite(preco)||preco<=0)){toast('Preço inválido',1);return}
-  const kgU=conKgOf(p)||3,baldes=un==='bm'?vol:un==='bd'?vol*CON_CFG.dias_mes:vol/kgU,kg=baldes*kgU;
-  const unLab={bm:'baldes/mês',bd:'baldes/dia',kg:'kg/mês'}[un],hoje=new Date();
-  const alertas=[];if(preco==null)alertas.push('Preço do concorrente não informado');if(!vol)alertas.push('Volume mensal não informado');
+  const g=id=>$(id).value.trim(),nome=g('nfNome'),conc=g('nfConc');
+  if(!nome||!conc){toast('Informe nome e concorrente',1);return}
+  const rows=conPRowsRead($('nfRows')).map(r=>conPRowItem(r,conc)),bad=rows.find(r=>r.err);
+  if(!rows.length){toast('Inclua ao menos um produto',1);return}if(bad){toast(bad.err,1);return}
+  const alertas=[];if(rows.some(r=>r.it.preco_unit==null))alertas.push('Preço do concorrente não informado');if(rows.some(r=>!r.vol))alertas.push('Volume mensal não informado');
   $('nfSave').disabled=true;
   try{
-    const {data:c,error}=await sb.from('concorrencia_clientes').insert({nome,segmento:$('nfSeg').value||null,concorrente:conc,uf:$('nfUf').value,fonte:'Cadastrado no painel em '+hoje.toLocaleDateString('pt-BR'),data_ref:hojeISO(),obs:`Volume informado: ${fmtIn(vol)} ${unLab}${un==='bd'?' (× '+fmtIn(CON_CFG.dias_mes)+' dias/mês)':''}.`,modo:'mensal',etapa:$('nfEt').value,alertas}).select().single();
+    const {data:c,error}=await sb.from('concorrencia_clientes').insert({nome,segmento:$('nfSeg').value||null,concorrente:conc,uf:$('nfUf').value,fonte:'Cadastrado no painel em '+new Date().toLocaleDateString('pt-BR'),data_ref:hojeISO(),obs:rows.map(r=>`${nice(r.p.descricao)}: ${fmtIn(r.vol)} ${CON_UN[r.un]}`).join(' · '),modo:'mensal',etapa:$('nfEt').value,alertas}).select().single();
     if(error)throw error;
-    const it={cliente_id:c.id,item_n:1,produto:g('nfProdC')||(conc+' · '+nice(p.descricao)),embalagem:`Balde ${fmtIn(kgU)} kg`,um:'BALDE',qtde:Math.round(kg*10000)/10000,volumes:Math.round(baldes*10000)/10000,preco_unit:preco,nosso_codigo:p.codigo||null,nosso_chave_cmv:p.chave_cmv,preco_fonte:preco==null?null:'cliente',match_obs:'Cadastrado no painel.'};
-    const {data:i,error:e2}=await sb.from('concorrencia_itens').insert(it).select().single();
-    if(e2){CON.clientes.push(c);throw new Error('cliente salvo, mas o produto não: '+e2.message)}
-    CON.clientes.push(c);CON.itens.push(i);CON.clientes.sort((a,b)=>a.nome.localeCompare(b.nome));
-    CON.form=false;CON.view='clientes';CON.sel=c.id;CON.uf=c.uf||'SP';CON.dirty={};toast(nome+' cadastrado');renderCon();
+    CON.clientes.push(c);CON.clientes.sort((a,b)=>a.nome.localeCompare(b.nome));
+    const {data:its,error:e2}=await sb.from('concorrencia_itens').insert(rows.map((r,k)=>({...r.it,cliente_id:c.id,item_n:k+1}))).select();
+    if(e2)throw new Error('cliente salvo, mas os produtos não: '+e2.message);
+    CON.itens.push(...its);
+    CON.form=false;CON.view='clientes';CON.sel=c.id;CON.uf=c.uf||'SP';CON.dirty={};toast(`${nome} cadastrado · ${its.length} produto(s)`);renderCon();
   }catch(e){toast('Não foi possível salvar: '+e.message,1)}finally{const b=$('nfSave');if(b)b.disabled=false}
+}
+/* + Produto em cliente existente */
+function conAddOpen(){CON.add=true;renderCon();const b=$('conAddBox');if(b)b.scrollIntoView({behavior:'smooth',block:'nearest'})}
+function conAddClose(){CON.add=false;renderCon()}
+async function conAddSave(){
+  const c=CON.clientes.find(x=>x.id===CON.sel);if(!c||CON.fallback)return;
+  const r=conPRowItem(conPRowsRead($('conAddBox'))[0]||{},c.concorrente);if(r.err){toast(r.err,1);return}
+  const n=Math.max(0,...CON.itens.filter(i=>i.cliente_id===c.id).map(i=>i.item_n))+1;
+  const btn=$('conAddSave');if(btn)btn.disabled=true;
+  const {data,error}=await sb.from('concorrencia_itens').insert({...r.it,cliente_id:c.id,item_n:n}).select().single();
+  if(error){toast('Não foi possível incluir: '+error.message,1);if(btn)btn.disabled=false;return}
+  CON.itens.push(data);CON.add=false;toast('Produto incluído em '+c.nome);renderCon();
+}
+async function conItemDel(id){
+  const i=CON.itens.find(x=>x.id===id);if(!i)return;
+  const c=CON.clientes.find(x=>x.id===i.cliente_id),left=CON.itens.filter(x=>x.cliente_id===i.cliente_id).length;
+  if(!confirm(`Remover "${i.produto}" de ${c?c.nome:'cliente'}?${left===1?'\n\nÉ o último produto: o cliente fica sem volume.':''}`))return;
+  const {error}=await sb.from('concorrencia_itens').delete().eq('id',id);
+  if(error){toast('Não foi possível remover: '+error.message,1);return}
+  CON.itens=CON.itens.filter(x=>x.id!==id);delete CON.dirty[i.item_n];delete CON.sim[id];delete CON.open[id];toast('Produto removido');renderCon();
+}
+function conMProd(n,pid){
+  const p=PROD.find(x=>x.id===pid);if(!p)return;
+  const it=CON.itens.find(i=>i.cliente_id===CON.sel&&i.item_n===n);if(!it)return;
+  const cur={...it,...CON.dirty[n]},oldKg=conKgOf(conProduct(cur))||3,b=(Number(cur.qtde)||0)/oldKg,kgU=conKgOf(p)||3;
+  if(!CON.dirty[n])CON.dirty[n]={};
+  /* mantém os baldes/mês ao trocar o produto */
+  Object.assign(CON.dirty[n],{nosso_codigo:p.codigo||null,nosso_chave_cmv:p.chave_cmv,embalagem:`Balde ${fmtIn(kgU)} kg`,qtde:Math.round(b*kgU*10000)/10000,volumes:Math.round(b*10000)/10000});
+  renderCon();
 }
 async function conUfChange(v){
   const c=CON.clientes.find(c=>c.id===CON.sel);CON.uf=v;
@@ -2972,7 +3030,7 @@ function renderConM(client){
   $('conMHead').innerHTML=`<tr><th>Produto<br>concorrente → Laben</th><th>Baldes/mês</th><th>Concorrente<br>R$/balde</th><th>Tabela ${esc(uf)}<br>e diferença</th><th>CMV<br>R$/balde</th><th>Proposta<br>R$/balde</th><th class="gN">Nutríssima<br>Lucro Real</th><th class="gL">LBR<br>Simples</th><th>No mês<br>fat. · margem</th><th></th></tr>`;
   $('conMBody').innerHTML=s.rows.map(r=>{const i=r.i,n=i.item_n,op=!!CON.open[i.id];
     const main=`<tr class="${op?'conOpen':''}">
-    <td><strong>${esc(i.produto)}</strong>${conTags(i.alertas)}<div class="sub">→ ${r.p?esc(nice(r.p.descricao))+(r.p.codigo?' · '+esc(r.p.codigo):''):'<span class="c-warn">equivalente não carregado</span>'}</div></td>
+    <td><strong>${esc(i.produto)}</strong>${conTags(i.alertas)}<div class="sub conPSel">→ <select aria-label="Produto Laben" onchange="conMProd(${n},this.value)" ${CON.saving?'disabled':''}>${r.p?'':'<option selected>equivalente não carregado</option>'}${conProdOpts(r.p&&r.p.id)}</select></div><button class="link conRm" type="button" onclick="conItemDel('${esc(i.id)}')">Remover</button></td>
     <td>${inp(n,'baldes',r.b?Math.round(r.b*10)/10:null,'Baldes por mês',64)}<div class="sub">${r.noVol?'<span class="c-warn">a informar</span>':conNum(r.kg)+' kg'}</div></td>
     <td>${inp(n,'preco_unit',r.comp,'Preço do concorrente por balde',72)}<div class="sub">${r.comp==null?'<span class="c-warn">não informado</span>':brl(r.compKg)+'/kg'}</div><div class="sub">${r.comp==null?'':r.ref?'<span class="c-warn">ref. Doremus SP</span>':'pago pelo cliente'}</div></td>
     <td><strong>${brl(r.tab)}</strong><div class="sub">${brl(r.tabKg)}/kg</div><div class="sub ${r.gap==null?'':r.gap>0?'c-bad':'c-ok'}">${r.gap==null?'':(r.gap>0?'+':'')+brl(r.gap)+' · '+(r.gap>0?'+':'')+pct(r.gapPct)}</div></td>
@@ -2989,6 +3047,7 @@ function renderConM(client){
     </div></td></tr>`;
     return main+sim}).join('')+
     (s.rows.length>1?`<tr class="tot"><td><strong>Total ${esc(client.nome)}</strong></td><td><strong>${conBal(s.b)}</strong><div class="sub">${conNum(s.kg)} kg</div></td><td colspan="2"></td><td>${s.cmvM==null?'—':`<strong>${brl(s.cmvM)}</strong><div class="sub">CMV no mês · ${pct(s.cmvP)}</div>`}</td><td></td><td class="gN">${conMoney(s.mN,s.pN)}<div class="sub">no mês</div></td><td class="gL">${conMoney(s.mL,s.pL)}<div class="sub">no mês</div></td><td><strong>${brl(s.rev)}</strong></td><td></td></tr>`:'');
+  $('conAdd').innerHTML=CON.add?`<div class="card" id="conAddBox" style="margin-top:12px"><div class="conResH" style="margin:0 0 10px"><h3 style="font-size:15px">Novo produto para ${esc(client.nome)}</h3><button class="link" type="button" onclick="conAddClose()">Cancelar</button></div><div class="conPRows">${conPRowHtml(0,{},'')}</div><div style="margin-top:10px"><button class="btn" id="conAddSave" type="button" onclick="conAddSave()">Incluir produto</button></div></div>`:`<div style="margin:10px 0 0"><button class="btn sec tiny" type="button" onclick="conAddOpen()">+ Produto</button> <span class="muted" style="font-size:12px">${s.rows.length} produto(s) · porte pela soma: ${conBal(s.b)} baldes/mês (${esc(s.porte)})</span></div>`;
   const best=s.mN!=null&&s.mL!=null?(s.mL>=s.mN?'LBR':'Nutríssima'):null;
   $('conMNotes').innerHTML=`${best&&s.kg?(Math.abs(s.mL-s.mN)<0.005?'<b>Nutríssima e LBR deixam a mesma margem com esta carga.</b><br>':`<b>Faturando pela ${best} sobra mais: ${brl(Math.abs(s.mL-s.mN))}/mês a mais.</b><br>`):''}
    Margem = proposta − CMV − proposta × carga (por dentro). Índice = margem × 10 (5,0 = 50%); verde a partir de ${conIdxMin()}, o mesmo mínimo do Orçamento. Cliente B2B contribuinte de ICMS, sem DIFAL.<br>
