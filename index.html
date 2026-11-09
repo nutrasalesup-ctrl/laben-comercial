@@ -514,6 +514,26 @@ tr.row.off .pn{font-weight:400}
 .conTag.warn{background:var(--warn-bg);color:var(--warn)}.conTag.bad{background:var(--bad-bg);color:var(--bad)}
 .conResH{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:14px}.conResH h3{margin:0;font-size:17px}
 #conMNotes{font-size:12px;line-height:1.8;margin-top:16px}
+.conViewBar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:14px 0 4px;flex-wrap:wrap}
+.conH3{font-size:15px;margin:18px 0 8px}.conPipe table{min-width:860px}.conPipe tbody tr{cursor:default}.conPipe tbody tr:hover{background:none}
+.conRes th.gN,.conRes td.gN{background:rgba(0,113,227,.04)}.conRes th.gL,.conRes td.gL{background:rgba(52,199,89,.05)}.conRes th.gN{color:#0058b0}.conRes th.gL{color:#1d7a3a}
+.conCfg{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#conMeta{display:contents}
+.conMT tr.conOpen td{border-bottom:0}
+.conSimRow td{background:#fafafc;padding:4px 12px 14px;text-align:left;white-space:normal}
+.conSim{display:grid;grid-template-columns:1.5fr 1fr auto;gap:12px;align-items:start}
+.conSimG{background:#fff;border-radius:12px;padding:10px 12px;box-shadow:inset 0 0 0 1px var(--line)}
+.conSimF{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 6px}
+.conSimF label{display:grid;gap:3px;font-size:11px;color:var(--mut)}.conSimF label span{display:flex;align-items:center;gap:3px}
+.conSimF label.chg input{border-color:var(--warn);background:var(--warn-bg)}
+.conSimA{display:grid;gap:6px;justify-items:start}.conSimX{grid-column:1/-1;font-size:11px;color:var(--mut);line-height:1.6}
+@media(max-width:900px){.conSim{grid-template-columns:1fr}}
+#conForm{margin-top:16px}
+.conFormGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.conFormGrid label{font-size:12px;color:var(--mut);display:grid;gap:5px}.conFormGrid .w2{grid-column:span 2}
+.conFormGrid input{border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;color:var(--ink);background:#fff}
+.conFormGrid .sel{width:100%}
+@media(max-width:820px){.conFormGrid{grid-template-columns:1fr 1fr}}
 #conK .kpi b{font-size:26px}#conK{margin-top:18px}#conNotes{line-height:1.8;font-size:12px;margin-top:16px}#conProjection{margin-top:16px;font-size:13px;line-height:1.7}
 </style>
 </head>
@@ -548,13 +568,14 @@ tr.row.off .pn{font-weight:400}
   <section id="tab-concorrencia" class="hide">
     <div class="top"><div class="title"><h2>Concorrência</h2><div class="cond" id="conCond"></div></div></div>
     <div id="conResumo"></div>
-    <div class="conControls">
+    <div class="card hide" id="conForm"></div>
+    <div class="conControls" id="conCtl">
       <label>Cliente / concorrente<select class="sel" id="conClient" onchange="conClient(this.value)"></select></label>
       <label>UF da simulação<select class="sel" id="conUf" onchange="conUfChange(this.value)"></select></label>
       <label id="conFreqWrap">Pedidos iguais por mês (opcional)<input class="conInput" id="conFreq" inputmode="decimal" placeholder="Não informado" onchange="const n=num(this.value);if(this.value.trim()&&(n==null||!Number.isFinite(n)||n<=0)){toast('Frequência inválida',1);this.value=CON.freq}else{CON.freq=this.value;renderCon()}"></label>
       <button class="btn sec" id="conEdit" type="button" onclick="conEdit()">Editar pedido</button>
       <button class="btn hide" id="conSave" type="button" onclick="conSave()">Salvar pedido</button>
-      <button class="link" type="button" onclick="conLoad(true)">Atualizar dados</button><span id="conStatus"></span>
+      <span id="conMeta"></span><button class="btn sec tiny hide" id="conSimAll" type="button" onclick="conSimReset()">Resetar simulações</button><button class="link" type="button" onclick="conLoad(true)">Atualizar dados</button><span id="conStatus"></span>
     </div>
     <div id="conK" class="kpis"></div>
     <div class="conTable" id="conPedTable"><table aria-label="Pedido concorrente versus Laben"><thead><tr><th>Produto Doremus</th><th>Embalagem</th><th>Vol.</th><th>kg</th><th>Doremus<br>R$/kg</th><th>Total<br>Doremus</th><th>Equivalente Laben</th><th>Laben<br>R$/kg</th><th>Diferença<br>R$ e %</th><th>CMV<br>R$/kg</th><th>Tabela no volume<br>Receita / margem</th><th>Empatar no volume<br>Receita / margem</th></tr></thead><tbody id="conBody"></tbody></table></div>
@@ -2644,6 +2665,7 @@ async function conLoad(force=false){
   if(force&&Object.keys(CON.dirty).length&&!confirm('Descartar alterações não salvas e recarregar?'))return;
   CON.loading=true;
   try{
+    await conCfgLoad();
     const [c,i]=await Promise.all([sb.from('concorrencia_clientes').select('*').order('nome'),sb.from('concorrencia_itens').select('*').order('item_n')]);
     if(c.error||i.error||!c.data?.length)throw new Error(c.error?.message||i.error?.message||'Sem clientes acessíveis');
     CON.clientes=c.data;CON.itens=i.data||[];CON.fallback=false;CON.dirty={};CON.edit=false;
@@ -2687,10 +2709,13 @@ function conSummary(rows){
 function renderCon(){
   if(!$('conBody'))return;
   const client=CON.clientes.find(c=>c.id===CON.sel)||CON.clientes[0];if(!client)return;
-  conResumo(client);
-  const mensal=client.modo==='mensal';
-  ['conK','conPedTable','conProjection','conNotes','conFreqWrap','conEdit'].forEach(id=>$(id)&&$(id).classList.toggle('hide',mensal));
-  $('conMWrap').classList.toggle('hide',!mensal);
+  conResumo(client);renderConForm();
+  const pipe=CON.view==='pipeline',mensal=client.modo==='mensal';
+  $('conCtl').classList.toggle('hide',pipe);$('conCond').classList.toggle('hide',pipe);
+  ['conK','conPedTable','conProjection','conNotes','conFreqWrap','conEdit'].forEach(id=>$(id)&&$(id).classList.toggle('hide',mensal||pipe));
+  $('conMWrap').classList.toggle('hide',!mensal||pipe);
+  if(pipe)return;
+  conMetaBar(client);
   if(mensal){renderConM(client);return}
   const e=EST.find(e=>e.uf===CON.uf),rows=conRows().map(i=>conItem(i,e)),s=conSummary(rows);
   $('conClient').innerHTML=CON.clientes.map(c=>`<option value="${esc(c.id)}" ${c.id===client.id?'selected':''}>${esc(c.nome)} · ${esc(c.concorrente)}</option>`).join('');
@@ -2721,64 +2746,191 @@ function renderCon(){
   $('conProjection').innerHTML=freq!=null&&freq>0?`<b>Projeção hipotética · ${conNum(freq)} pedido(s) iguais por mês</b><p>${conNum(s.matchedKg*freq)} kg substituíveis/mês · Tabela: receita ${brl(s.revenue==null?null:s.revenue*freq)} e margem ${s.partial?'parcial ':''}${brl(s.margin==null?null:s.margin*freq)} · Empate: receita ${brl(s.matchRevenue==null?null:s.matchRevenue*freq)} e margem ${s.partial?'parcial ':''}${brl(s.matchMargin==null?null:s.matchMargin*freq)}.</p><span class="muted">Somente hipótese informada neste campo; frequência de compra ainda não confirmada.</span>`:'Sem frequência informada: os potenciais acima são de um único pedido.';
 }
 
-/* ---------- Concorrência: projetos mensais (consumo informado pelo cliente) ----------
-   Mesmas fórmulas do painel (calc): tudo por dentro, carga do estado do cliente.
-   Nutríssima = Lucro Real (ICMS + PIS + COFINS do cadastro do estado); LBR = Simples (alíquota da aba Empresa). */
+/* ---------- Concorrência: projetos mensais, simulação por linha e potencial em negociação ----------
+   Fórmula do painel (por dentro): margem = P − CMV − P × (ICMS + PIS + COFINS + frete + comissão + degustação).
+   Nutríssima = Lucro Real (carga do estado do cliente). LBR = Simples (alíquota da aba Empresa, sem ICMS/PIS/COFINS).
+   A simulação por linha fica só na memória desta tela: nunca grava na aba Estados. */
 const CON_EMP={nutrissima:'Nutríssima · Lucro Real',lbr:'LBR · Simples'};
+const CON_ETAPAS=[['Prospecção',.10],['Amostra',.25],['Proposta',.40],['Negociação',.60],['Fechado',1],['Perdido',0]];
+const CON_SEGS=['Pipoca gourmet','Açaí','Confeitaria','Outro'];
+let CON_CFG={pequeno:20,medio:50,dias_mes:22};
+Object.assign(CON,{view:'clientes',sim:{},open:{},form:false});
+const conBal=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const conIdxMin=()=>ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1});
+const conP=v=>v==null?'':fmtIn(Math.round(v*100000)/1000);
 function conKgOf(p){const m=String(p&&p.embalagem||'').match(/([\d.,]+)\s*kg/i);return m?Number(m[1].replace(',','.')):null}
 function conCarga(c){return c==null||c.semSimples?null:(c.imPct||0)+(c.pisPct||0)+(c.cofPct||0)+(c.frPct||0)+(c.cd||0)}
+function conProb(c){return c.probabilidade!=null?Number(c.probabilidade):(CON_ETAPAS.find(x=>x[0]===c.etapa)||[0,0])[1]}
+function conSeg(c){return c.segmento||'não informado'}
+function conPortes(){const f=CON_CFG;return [['Pequeno',`até ${f.pequeno} baldes/mês`],['Médio',`${f.pequeno+1} a ${f.medio} baldes/mês`],['Grande',`acima de ${f.medio} baldes/mês`],['Sem volume','volume mensal não informado']]}
+function conPorte(b){if(!b)return 'Sem volume';return b<=CON_CFG.pequeno?'Pequeno':b<=CON_CFG.medio?'Médio':'Grande'}
+async function conCfgLoad(){try{const {data,error}=await sb.from('concorrencia_config').select('*').eq('chave','porte').maybeSingle();if(!error&&data&&data.valor)CON_CFG={...CON_CFG,...data.valor}}catch(e){console.warn(e)}}
+async function conCfgSave(){
+  const g=id=>num($(id).value),p=g('cfgP'),m=g('cfgM'),d=g('cfgD');
+  if([p,m,d].some(v=>v==null||!Number.isFinite(v)||v<=0)||m<=p){toast('Faixas inválidas: Pequeno < Médio, valores maiores que zero',1);return}
+  const valor={pequeno:p,medio:m,dias_mes:d};
+  const {error}=await sb.from('concorrencia_config').upsert({chave:'porte',valor,updated_at:new Date().toISOString()},{onConflict:'chave'});
+  if(error){toast('Não foi possível salvar as faixas: '+error.message,1);return}
+  CON_CFG=valor;toast('Faixas de porte salvas');renderCon();
+}
+/* padrões da linha: estado do cliente + empresa */
+function conDefaults(p,r,e){
+  const N=calc(p,r,e,1,100,'nutrissima'),L=calc(p,r,e,1,100,'lbr'),en=estEff(e,'nutrissima');
+  const com=Number(en.comissao_pct)||0,deg=Number(en.degustacao_pct)||0;
+  return {n:{icms:N.imPct||0,pis:N.pisPct||0,cof:N.cofPct||0,fr:N.frPct||0,com,deg},l:L.semSimples?null:{simp:L.imPct||0,fr:L.frPct||0,com,deg}};
+}
+const conSumN=t=>t.icms+t.pis+t.cof+t.fr+t.com+t.deg,conSumL=t=>t.simp+t.fr+t.com+t.deg;
+function conMg(P,cmv,c){if(P==null||cmv==null||c==null)return {m:null,mp:null,carga:c};const m=P-cmv-P*c;return {m,mp:P?m/P:null,carga:c}}
 function conMItem(i,uf){
   const p=conProduct(i),e=EST.find(x=>x.uf===uf),kgU=conKgOf(p)||3;
   const comp=i.preco_unit==null?null:Number(i.preco_unit),kg=Number(i.qtde)||0,b=kg/kgU;
-  const o={i,p,e,uf,kgU,comp,compKg:comp==null?null:comp/kgU,kg,b,ref:i.preco_fonte!=='cliente',noVol:!kg};
+  const o={i,p,e,uf,kgU,comp,compKg:comp==null?null:comp/kgU,kg,b,ref:i.preco_fonte==='ref_doremus_sp',noVol:!kg};
   if(!p||!e)return o;
   const r=preRow(uf,p.id)||{};o.r=r;
   const t=precoFaixa(r,1,p);o.tab=t==null?null:Number(t);o.tabKg=o.tab==null?null:o.tab/kgU;
   if(comp!=null&&o.tab!=null){o.gap=o.tab-comp;o.gapPct=comp?o.gap/comp:null}
   o.cmv=cmvOf(p.chave_cmv);
-  o.carN=conCarga(calc(p,r,e,1,100,'nutrissima'));o.carL=conCarga(calc(p,r,e,1,100,'lbr'));
+  const d=conDefaults(p,r,e),s=CON.sim[i.id]||{};o.def=d;o.simN=!!s.n;o.simL=!!s.l;o.simOn=o.simN||o.simL;
+  o.tN={...d.n,...(s.n||{})};o.tL=d.l?{...d.l,...(s.l||{})}:null;
+  o.carN=conSumN(o.tN);o.carL=o.tL?conSumL(o.tL):null;
   const piso=c=>c==null||o.cmv==null||1-c-ORC_MIN/10<=0?null:Math.ceil(o.cmv/(1-c-ORC_MIN/10)*10)/10;
   o.pisoN=piso(o.carN);o.pisoL=piso(o.carL);
-  let sug=o.tab,why=o.ref?'Sem preço real do concorrente: usa o preço de tabela '+uf+'.':'Preço de tabela '+uf+'.';
+  let sug=o.tab,why=comp==null?'Sem preço do concorrente: preço de tabela '+uf+'.':o.ref?'Preço do concorrente é referência: usa a tabela '+uf+'.':'Preço de tabela '+uf+'.';
   if(!o.ref&&comp!=null&&o.tab!=null){
     const cand=Math.min(o.tab,Math.floor((comp-1)*10)/10);
     sug=cand;why=cand===o.tab?'A tabela '+uf+' já fica abaixo do concorrente.':'R$ 1,00 abaixo do preço do concorrente.';
-    if(o.pisoL!=null&&cand<o.pisoL){sug=o.pisoL;o.semSaida=true;why='Abaixo do concorrente não há margem saudável: sugerido o piso da LBR (índice '+ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})+'), acima do preço do concorrente.'}
+    if(o.pisoL!=null&&cand<o.pisoL){sug=o.pisoL;o.semSaida=true;why='Abaixo do concorrente não há margem saudável: sugerido o piso da LBR (índice '+conIdxMin()+'), acima do preço do concorrente.'}
   }
   o.sug=sug;o.why=why;o.propManual=i.proposta_unit!=null;o.prop=o.propManual?Number(i.proposta_unit):sug;
   if(o.prop!=null){
-    o.N=calc(p,r,e,1,o.prop,'nutrissima');o.L=calc(p,r,e,1,o.prop,'lbr');
+    o.N=conMg(o.prop,o.cmv,o.carN);o.L=conMg(o.prop,o.cmv,o.carL);
     o.rev=o.prop*b;o.mN=o.N.m==null?null:o.N.m*b;o.mL=o.L.m==null?null:o.L.m*b;
     if(comp!=null){o.pGap=o.prop-comp;o.pGapPct=comp?o.pGap/comp:null}
     const ch=p.chave_cmv==='AVELA|3KG'?PROD.find(x=>x.chave_cmv==='AVELA_CHEF|3KG'):null;
-    if(ch){const rc=preRow(uf,ch.id)||{};o.chef={p:ch,N:calc(ch,rc,e,1,o.prop,'nutrissima'),L:calc(ch,rc,e,1,o.prop,'lbr')}}
+    if(ch){const cc=cmvOf(ch.chave_cmv);o.chef={p:ch,cmv:cc,N:conMg(o.prop,cc,o.carN),L:conMg(o.prop,cc,o.carL)}}
   }
   return o;
 }
 function conMClient(c){
-  const uf=c.uf||'SP';
-  const rows=CON.itens.filter(i=>i.cliente_id===c.id).map(i=>c.id===CON.sel?{...i,...CON.dirty[i.item_n]}:i).sort((a,b)=>a.item_n-b.item_n).map(i=>conMItem(i,uf));
-  const sum=f=>rows.reduce((s,r)=>s+(Number(r[f])||0),0),all=f=>rows.every(r=>r[f]!=null);
-  const rev=sum('rev'),mN=all('mN')?sum('mN'):null,mL=all('mL')?sum('mL'):null;
-  return {c,uf,rows,kg:sum('kg'),b:sum('b'),rev,mN,mL,pN:rev&&mN!=null?mN/rev:null,pL:rev&&mL!=null?mL/rev:null,noVol:rows.some(r=>r.noVol)};
+  const uf=c.uf||'SP',mensal=c.modo==='mensal';
+  const rows=mensal?CON.itens.filter(i=>i.cliente_id===c.id).map(i=>c.id===CON.sel?{...i,...CON.dirty[i.item_n]}:i).sort((a,b)=>a.item_n-b.item_n).map(i=>conMItem(i,uf)):[];
+  const sum=f=>rows.reduce((s,r)=>s+(Number(r[f])||0),0),all=f=>rows.length&&rows.every(r=>r[f]!=null);
+  const rev=sum('rev'),mN=all('mN')?sum('mN'):null,mL=all('mL')?sum('mL'):null,b=sum('b');
+  const wp=f=>{const k=rows.filter(r=>r[f]!=null&&r.b);const w=k.reduce((s,r)=>s+r.b,0);return w?k.reduce((s,r)=>s+r[f]*r.b,0)/w:null};
+  return {c,uf,mensal,rows,kg:sum('kg'),b,rev,mN,mL,pN:rev&&mN!=null?mN/rev:null,pL:rev&&mL!=null?mL/rev:null,noVol:!b,prob:conProb(c),porte:conPorte(b),
+    pisoN:wp('pisoN'),pisoL:wp('pisoL'),pisos:rows.flatMap(r=>[r.pisoN,r.pisoL]),pisoNs:rows.map(r=>r.pisoN).filter(v=>v!=null),pisoLs:rows.map(r=>r.pisoL).filter(v=>v!=null),sim:rows.some(r=>r.simOn)};
 }
-const conBal=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1});
 function conPill(mp){if(mp==null)return '<span class="pill na">—</span>';const v=mp*10;return `<span class="pill ${v<0?'bad':v<ORC_MIN?'warn':'ok'}">${idx(mp)}</span>`}
 function conTags(a){return (a||[]).map(t=>`<span class="conTag ${/conferir/i.test(t)?'bad':'warn'}">${esc(t)}</span>`).join('')}
 function conMoney(m,p){return m==null?'—':`<strong class="${m<0?'c-bad':''}">${brl(m)}</strong><div class="sub">${pct(p)} da receita</div>`}
+function conOpts(list,v){return list.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}
+function conSegSel(c,inline){const v=c.segmento||'';const opts=[...CON_SEGS];if(v&&!opts.includes(v))opts.unshift(v);
+  return `<select class="sel" ${inline?'style="min-width:0;padding:5px 8px;font-size:12px"':''} aria-label="Segmento" onchange="conMeta('${esc(c.id)}','segmento',this.value)"><option value="" ${v?'':'selected'}>não informado</option>${conOpts(opts,v)}</select>`}
+function conEtapaSel(c,inline){return `<select class="sel" ${inline?'style="min-width:0;padding:5px 8px;font-size:12px"':''} aria-label="Etapa" onchange="conMeta('${esc(c.id)}','etapa',this.value)">${conOpts(CON_ETAPAS.map(x=>x[0]),c.etapa)}</select>`}
+function conProbIn(c){return `<input class="conInput" style="width:56px" aria-label="Probabilidade %" inputmode="decimal" value="${fmtIn(Math.round(conProb(c)*100))}" onchange="conMeta('${esc(c.id)}','probabilidade',this.value)">`}
+async function conMeta(id,f,raw){
+  const c=CON.clientes.find(x=>x.id===id);if(!c||CON.fallback){toast('Dados não conectados',1);return}
+  let upd={};
+  if(f==='probabilidade'){if(!String(raw).trim())upd.probabilidade=null;else{const v=num(raw);if(v==null||!Number.isFinite(v)||v<0||v>100){toast('Probabilidade entre 0 e 100',1);renderCon();return}upd.probabilidade=v/100}}
+  else if(f==='etapa'){upd={etapa:raw,probabilidade:null}}
+  else upd[f]=raw||null;
+  upd.updated_at=new Date().toISOString();
+  const {error}=await sb.from('concorrencia_clientes').update(upd).eq('id',id);
+  if(error){toast('Não foi possível salvar: '+error.message,1);renderCon();return}
+  Object.assign(c,upd);toast(c.nome+' atualizado');renderCon();
+}
+function conSetView(v){CON.view=v;renderCon()}
+function conSimSet(id,emp,f,raw){
+  const v=num(raw);if(v==null||!Number.isFinite(v)||v<0||v>=100){toast('Informe um % entre 0 e 99',1);renderCon();return}
+  const s=CON.sim[id]||(CON.sim[id]={});if(!s[emp])s[emp]={};s[emp][f]=v/100;renderCon();
+}
+function conSimReset(id){if(id)delete CON.sim[id];else CON.sim={};renderCon()}
+function conToggle(id){CON.open[id]=!CON.open[id];renderCon()}
 function conResumo(sel){
+  const box=$('conResumo');
+  const views=`<div class="conViewBar"><div class="seg" role="tablist"><button type="button" class="${CON.view==='clientes'?'on':''}" onclick="conSetView('clientes')">Clientes</button><button type="button" class="${CON.view==='pipeline'?'on':''}" onclick="conSetView('pipeline')">Potencial em negociação</button></div><button class="btn" type="button" onclick="conFormOpen()">+ Novo cliente</button></div>`;
+  if(CON.view==='pipeline'){box.innerHTML=views+conPipeHtml();return}
   const M=CON.clientes.filter(c=>c.modo==='mensal');
-  if(!M.length){$('conResumo').innerHTML='';return}
+  if(!M.length){box.innerHTML=views;return}
   const S=M.map(conMClient),T={kg:0,b:0,rev:0,mN:0,mL:0};
   S.forEach(s=>{T.kg+=s.kg;T.b+=s.b;T.rev+=s.rev||0;T.mN+=s.mN||0;T.mL+=s.mL||0});
   const ped=CON.clientes.filter(c=>c.modo!=='mensal');
-  $('conResumo').innerHTML=`<div class="conResH"><h3>Tamanho dos projetos · por mês</h3><span class="muted" style="font-size:12px">Volume × proposta, na carga do estado de cada cliente. Clique num cliente para abrir.</span></div>
-  <div class="conRes"><table aria-label="Resumo mensal por cliente"><thead><tr><th>Cliente · concorrente</th><th>UF</th><th>Volume/mês</th><th>Faturamento/mês<br>(proposta)</th><th style="color:#0058b0">Margem/mês<br>Nutríssima · Lucro Real</th><th style="color:#1d7a3a">Margem/mês<br>LBR · Simples</th><th>Diferença<br>LBR − Nutríssima</th></tr></thead><tbody>
-  ${S.map(s=>`<tr class="${s.c.id===sel.id?'on':''}" onclick="conClient('${esc(s.c.id)}')"><td><strong>${esc(s.c.nome)}</strong><div class="sub">${esc(s.c.concorrente)}</div>${conTags(s.c.alertas)}</td><td>${esc(s.uf)}</td>
-    <td>${s.noVol&&!s.kg?'<span class="c-warn">a informar</span>':`<strong>${conNum(s.kg)} kg</strong><div class="sub">${conBal(s.b)} baldes</div>`}</td>
+  box.innerHTML=views+`<div class="conResH"><h3>Tamanho dos projetos · por mês</h3><span class="muted" style="font-size:12px">Volume × proposta, na carga do estado de cada cliente${S.some(s=>s.sim)?' · <b class="c-warn">inclui simulação</b>':''}. Clique num cliente para abrir.</span></div>
+  <div class="conRes"><table aria-label="Resumo mensal por cliente"><thead><tr><th>Cliente · concorrente</th><th>Segmento · porte</th><th>Etapa</th><th>UF</th><th>Volume/mês</th><th>Faturamento/mês<br>(proposta)</th><th style="color:#0058b0">Margem/mês<br>Nutríssima · Lucro Real</th><th style="color:#1d7a3a">Margem/mês<br>LBR · Simples</th><th>Diferença<br>LBR − Nutríssima</th></tr></thead><tbody>
+  ${S.map(s=>`<tr class="${s.c.id===sel.id?'on':''}" onclick="conClient('${esc(s.c.id)}')"><td><strong>${esc(s.c.nome)}</strong><div class="sub">${esc(s.c.concorrente)}</div>${conTags(s.c.alertas)}</td>
+    <td style="text-align:left">${s.c.segmento?esc(s.c.segmento):'<span class="c-mut">não informado</span>'}<div class="sub">${esc(s.porte)}</div></td><td style="text-align:left">${esc(s.c.etapa)}<div class="sub">${pct0(s.prob)}</div></td><td>${esc(s.uf)}</td>
+    <td>${s.noVol?'<span class="c-warn">a informar</span>':`<strong>${conBal(s.b)} baldes</strong><div class="sub">${conNum(s.kg)} kg</div>`}</td>
     <td>${s.kg?`<strong>${brl(s.rev)}</strong>`:'—'}</td><td>${s.kg?conMoney(s.mN,s.pN):'—'}</td><td>${s.kg?conMoney(s.mL,s.pL):'—'}</td><td>${s.kg&&s.mN!=null&&s.mL!=null?brl(s.mL-s.mN):'—'}</td></tr>`).join('')}
-  <tr class="tot"><td>Total geral · ${S.length} clientes</td><td></td><td>${conNum(T.kg)} kg<div class="sub">${conBal(T.b)} baldes</div></td><td>${brl(T.rev)}</td><td>${brl(T.mN)}<div class="sub">${pct(T.rev?T.mN/T.rev:null)}</div></td><td>${brl(T.mL)}<div class="sub">${pct(T.rev?T.mL/T.rev:null)}</div></td><td>${brl(T.mL-T.mN)}</td></tr></tbody></table></div>
+  <tr class="tot"><td>Total geral · ${S.length} clientes</td><td></td><td></td><td></td><td>${conBal(T.b)} baldes<div class="sub">${conNum(T.kg)} kg</div></td><td>${brl(T.rev)}</td><td>${brl(T.mN)}<div class="sub">${pct(T.rev?T.mN/T.rev:null)}</div></td><td>${brl(T.mL)}<div class="sub">${pct(T.rev?T.mL/T.rev:null)}</div></td><td>${brl(T.mL-T.mN)}</td></tr></tbody></table></div>
   ${ped.length?`<div class="muted" style="font-size:12px;margin:0 0 6px">Fora do total mensal: ${ped.map(c=>`<a href="#" onclick="conClient('${esc(c.id)}');return false">${esc(c.nome)} · ${esc(c.concorrente)}</a>`).join(', ')} (pedido único, sem frequência confirmada).</div>`:''}`;
+}
+/* ----- Potencial em negociação ----- */
+function conAgg(list){const a={n:list.length,b:0,kg:0,rev:0,mN:0,mL:0,wb:0,wkg:0,wrev:0,wmN:0,wmL:0};
+  list.forEach(s=>{const p=s.prob;a.b+=s.b;a.kg+=s.kg;a.rev+=s.rev||0;a.mN+=s.mN||0;a.mL+=s.mL||0;a.wb+=s.b*p;a.wkg+=s.kg*p;a.wrev+=(s.rev||0)*p;a.wmN+=(s.mN||0)*p;a.wmL+=(s.mL||0)*p});return a}
+function conAggRow(lab,sub,a,extra=''){return `<tr><td><strong>${lab}</strong>${sub?`<div class="sub">${sub}</div>`:''}</td><td>${a.n}</td><td><strong>${conBal(a.b)}</strong><div class="sub">pond. ${conBal(a.wb)}</div></td><td>${conNum(a.kg)}<div class="sub">pond. ${conNum(a.wkg)}</div></td><td><strong>${brl(a.rev)}</strong><div class="sub">pond. ${brl(a.wrev)}</div></td><td class="gN"><strong>${brl(a.mN)}</strong><div class="sub">pond. ${brl(a.wmN)}</div></td><td class="gL"><strong>${brl(a.mL)}</strong><div class="sub">pond. ${brl(a.wmL)}</div></td>${extra}</tr>`}
+const conAggHead=(first,extra='')=>`<thead><tr><th>${first}</th><th>Clientes</th><th>Baldes/mês<br>cheio · ponderado</th><th>kg/mês</th><th>Faturamento/mês</th><th class="gN">Margem/mês<br>Nutríssima · Lucro Real</th><th class="gL">Margem/mês<br>LBR · Simples</th>${extra}</tr></thead>`;
+function conPipeHtml(){
+  const S=CON.clientes.map(conMClient),act=S.filter(s=>s.c.etapa!=='Perdido'),A=conAgg(act);
+  const k=(l,v,w)=>`<div class="kpi"><span>${l}</span><b>${v}</b><small>${w}</small></div>`;
+  const byE=CON_ETAPAS.map(([e,p])=>{const L=S.filter(s=>s.c.etapa===e);return L.length?conAggRow(esc(e),'padrão '+pct0(p),conAgg(L)):''}).join('');
+  const segs=[...new Set(S.map(s=>conSeg(s.c)))].sort((a,b)=>(a==='não informado')-(b==='não informado')||a.localeCompare(b));
+  const byS=segs.map(g=>conAggRow(g==='não informado'?'<span class="c-mut">não informado</span>':esc(g),'',conAgg(act.filter(s=>conSeg(s.c)===g)))).join('');
+  const rng=v=>v.length?(Math.min(...v)===Math.max(...v)?brl(Math.min(...v)):brl(Math.min(...v))+' a '+brl(Math.max(...v))):'—';
+  const byP=conPortes().map(([p,f])=>{const L=act.filter(s=>s.porte===p);if(!L.length)return '';const w=(fld)=>{const k=L.filter(s=>s[fld]!=null&&s.b);const t=k.reduce((x,s)=>x+s.b,0);return t?k.reduce((x,s)=>x+s[fld]*s.b,0)/t:null};
+    return conAggRow(esc(p),esc(f),conAgg(L),`<td class="gL"><strong>${brl(w('pisoL'))}</strong><div class="sub">${rng(L.flatMap(s=>s.pisoLs))}</div></td><td class="gN"><strong>${brl(w('pisoN'))}</strong><div class="sub">${rng(L.flatMap(s=>s.pisoNs))}</div></td>`)}).join('');
+  const tot=a=>`<tr class="tot"><td>Total ativo (sem Perdido)</td><td>${a.n}</td><td>${conBal(a.b)}<div class="sub">pond. ${conBal(a.wb)}</div></td><td>${conNum(a.kg)}<div class="sub">pond. ${conNum(a.wkg)}</div></td><td>${brl(a.rev)}<div class="sub">pond. ${brl(a.wrev)}</div></td><td>${brl(a.mN)}<div class="sub">pond. ${brl(a.wmN)}</div></td><td>${brl(a.mL)}<div class="sub">pond. ${brl(a.wmL)}</div></td>`;
+  const lista=S.map(s=>`<tr><td><a href="#" onclick="CON.view='clientes';conClient('${esc(s.c.id)}');return false"><strong>${esc(s.c.nome)}</strong></a><div class="sub">${esc(s.c.concorrente)} · ${esc(s.uf)}</div></td><td style="text-align:left">${conSegSel(s.c,1)}</td><td style="text-align:left">${conEtapaSel(s.c,1)}</td><td>${conProbIn(s.c)} %</td><td style="text-align:left">${esc(s.porte)}${s.mensal?'':'<div class="sub">pedido único</div>'}</td><td>${s.b?conBal(s.b):'—'}</td><td>${s.rev?brl(s.rev):'—'}<div class="sub">pond. ${s.rev?brl(s.rev*s.prob):'—'}</div></td><td class="gN">${s.b?brl(s.mN):'—'}<div class="sub">pond. ${s.b&&s.mN!=null?brl(s.mN*s.prob):'—'}</div></td><td class="gL">${s.b?brl(s.mL):'—'}<div class="sub">pond. ${s.b&&s.mL!=null?brl(s.mL*s.prob):'—'}</div></td></tr>`).join('');
+  return `<div class="kpis" style="margin-top:16px">${k('Clientes ativos (sem Perdido)',A.n,`${conBal(A.b)} baldes/mês · ${conNum(A.kg)} kg`)}${k('Faturamento/mês',brl(A.rev),'ponderado '+brl(A.wrev))}${k('Margem/mês · Nutríssima',brl(A.mN),'ponderada '+brl(A.wmN))}${k('Margem/mês · LBR',brl(A.mL),'ponderada '+brl(A.wmL))}</div>
+  <div class="muted" style="font-size:12px;margin:-6px 0 10px">Cheio = tudo o que está na mesa. Ponderado = cheio × probabilidade da etapa (editável por cliente). Perdido fica fora dos totais. ${S.some(s=>s.sim)?'<b class="c-warn">Inclui simulação de impostos/frete feita nas linhas.</b>':''}</div>
+  <h3 class="conH3">Por etapa</h3><div class="conRes conPipe"><table>${conAggHead('Etapa')}<tbody>${byE}${tot(conAgg(act))}</tr></tbody></table></div>
+  <h3 class="conH3">Por segmento</h3><div class="conRes conPipe"><table>${conAggHead('Segmento')}<tbody>${byS}${tot(conAgg(act))}</tr></tbody></table></div>
+  <div class="conResH"><h3 class="conH3" style="margin:0">Por porte</h3><span class="conCfg">Pequeno até <input class="conInput" id="cfgP" style="width:52px" value="${fmtIn(CON_CFG.pequeno)}"> · Médio até <input class="conInput" id="cfgM" style="width:52px" value="${fmtIn(CON_CFG.medio)}"> · Grande acima · baldes/dia × <input class="conInput" id="cfgD" style="width:44px" value="${fmtIn(CON_CFG.dias_mes)}"> dias/mês <button class="btn sec tiny" type="button" onclick="conCfgSave()">Salvar faixas</button></span></div>
+  <div class="conRes conPipe"><table>${conAggHead('Porte',`<th class="gL">Preço mínimo<br>índice ${conIdxMin()} · LBR</th><th class="gN">Preço mínimo<br>índice ${conIdxMin()} · Nutríssima</th>`)}<tbody>${byP}</tbody></table></div>
+  <div class="muted" style="font-size:12px;margin:4px 0 14px">Preço mínimo = R$/balde para o índice ${conIdxMin()} com a carga do estado de cada cliente (média ponderada pelo volume; abaixo, a faixa entre produtos). Porte pelo volume mensal em baldes.</div>
+  <h3 class="conH3">Clientes · etapa, probabilidade e segmento</h3><div class="conRes conPipe"><table><thead><tr><th>Cliente</th><th>Segmento</th><th>Etapa</th><th>Probab.</th><th>Porte</th><th>Baldes/mês</th><th>Faturamento/mês</th><th class="gN">Margem/mês Nutríssima</th><th class="gL">Margem/mês LBR</th></tr></thead><tbody>${lista}</tbody></table></div>`;
+}
+/* ----- + Novo cliente ----- */
+function conFormOpen(){CON.form=true;renderConForm();$('conForm').scrollIntoView({behavior:'smooth',block:'start'})}
+function conFormClose(){CON.form=false;renderConForm()}
+function renderConForm(){
+  const f=$('conForm');if(!f)return;f.classList.toggle('hide',!CON.form);if(!CON.form){f.innerHTML='';return}
+  const prods=PROD.filter(p=>p.chave_cmv&&(conKgOf(p)||0)>=3).sort((a,b)=>(conKgOf(a)-conKgOf(b))||String(a.descricao).localeCompare(b.descricao));
+  const def=prods.find(p=>p.codigo==='1164');
+  f.innerHTML=`<div class="conResH" style="margin:0 0 12px"><h3>Novo cliente</h3><button class="link" type="button" onclick="conFormClose()">Fechar</button></div>
+  <div class="conFormGrid">
+    <label>Nome<input class="inp" id="nfNome" placeholder="Ex.: Pipocas da Ana"></label>
+    <label>Segmento<select class="sel" id="nfSeg"><option value="">não informado</option>${conOpts(CON_SEGS,'')}</select></label>
+    <label>UF<select class="sel" id="nfUf">${EST.map(e=>`<option value="${esc(e.uf)}" ${e.uf==='SP'?'selected':''}>${esc(e.uf)} · ${esc(e.nome)}</option>`).join('')}</select></label>
+    <label>Concorrente<input class="inp" id="nfConc" placeholder="Ex.: Carino"></label>
+    <label class="w2">Produto Laben equivalente<select class="sel" id="nfProd">${prods.map(p=>`<option value="${esc(p.id)}" ${p===def?'selected':''}>${esc(nice(p.descricao))}${p.codigo?' · '+esc(p.codigo):''}</option>`).join('')}</select></label>
+    <label>Produto do concorrente (opcional)<input class="inp" id="nfProdC" placeholder="Ex.: Avelã Carino"></label>
+    <label>Preço pago por balde (opcional)<input class="inp" id="nfPreco" inputmode="decimal" placeholder="R$"></label>
+    <label>Volume<input class="inp" id="nfVol" inputmode="decimal" placeholder="Ex.: 20"></label>
+    <label>Unidade<select class="sel" id="nfUn"><option value="bm">baldes/mês</option><option value="bd">baldes/dia</option><option value="kg">kg/mês</option></select></label>
+    <label>Etapa<select class="sel" id="nfEt">${conOpts(CON_ETAPAS.map(x=>x[0]),'Prospecção')}</select></label>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" type="button" id="nfSave" onclick="conFormSave()">Salvar cliente</button><span class="muted" style="font-size:12px">Baldes/dia × ${fmtIn(CON_CFG.dias_mes)} dias = baldes/mês. Sem preço, a proposta começa na tabela do estado.</span></div>`;
+}
+async function conFormSave(){
+  if(CON.fallback){toast('Dados não conectados: recarregue a página',1);return}
+  const g=id=>$(id).value.trim(),nome=g('nfNome'),conc=g('nfConc'),p=PROD.find(x=>x.id===$('nfProd').value);
+  const vol=num(g('nfVol')),preco=g('nfPreco')?num(g('nfPreco')):null,un=$('nfUn').value;
+  if(!nome||!conc||!p){toast('Informe nome, concorrente e produto',1);return}
+  if(vol==null||!Number.isFinite(vol)||vol<0){toast('Volume inválido',1);return}
+  if(preco!=null&&(!Number.isFinite(preco)||preco<=0)){toast('Preço inválido',1);return}
+  const kgU=conKgOf(p)||3,baldes=un==='bm'?vol:un==='bd'?vol*CON_CFG.dias_mes:vol/kgU,kg=baldes*kgU;
+  const unLab={bm:'baldes/mês',bd:'baldes/dia',kg:'kg/mês'}[un],hoje=new Date();
+  const alertas=[];if(preco==null)alertas.push('Preço do concorrente não informado');if(!vol)alertas.push('Volume mensal não informado');
+  $('nfSave').disabled=true;
+  try{
+    const {data:c,error}=await sb.from('concorrencia_clientes').insert({nome,segmento:$('nfSeg').value||null,concorrente:conc,uf:$('nfUf').value,fonte:'Cadastrado no painel em '+hoje.toLocaleDateString('pt-BR'),data_ref:hojeISO(),obs:`Volume informado: ${fmtIn(vol)} ${unLab}${un==='bd'?' (× '+fmtIn(CON_CFG.dias_mes)+' dias/mês)':''}.`,modo:'mensal',etapa:$('nfEt').value,alertas}).select().single();
+    if(error)throw error;
+    const it={cliente_id:c.id,item_n:1,produto:g('nfProdC')||(conc+' · '+nice(p.descricao)),embalagem:`Balde ${fmtIn(kgU)} kg`,um:'BALDE',qtde:Math.round(kg*10000)/10000,volumes:Math.round(baldes*10000)/10000,preco_unit:preco,nosso_codigo:p.codigo||null,nosso_chave_cmv:p.chave_cmv,preco_fonte:preco==null?null:'cliente',match_obs:'Cadastrado no painel.'};
+    const {data:i,error:e2}=await sb.from('concorrencia_itens').insert(it).select().single();
+    if(e2){CON.clientes.push(c);throw new Error('cliente salvo, mas o produto não: '+e2.message)}
+    CON.clientes.push(c);CON.itens.push(i);CON.clientes.sort((a,b)=>a.nome.localeCompare(b.nome));
+    CON.form=false;CON.view='clientes';CON.sel=c.id;CON.uf=c.uf||'SP';CON.dirty={};toast(nome+' cadastrado');renderCon();
+  }catch(e){toast('Não foi possível salvar: '+e.message,1)}finally{const b=$('nfSave');if(b)b.disabled=false}
 }
 async function conUfChange(v){
   const c=CON.clientes.find(c=>c.id===CON.sel);CON.uf=v;
@@ -2791,44 +2943,56 @@ async function conUfChange(v){
 }
 function conMChange(n,f,raw){
   if(!CON.dirty[n])CON.dirty[n]={};
-  if(f==='proposta_unit'&&!String(raw).trim()){CON.dirty[n].proposta_unit=null;renderCon();return}
+  if((f==='proposta_unit'||f==='preco_unit')&&!String(raw).trim()){CON.dirty[n][f]=null;renderCon();return}
   const v=num(raw);if(v==null||!Number.isFinite(v)||v<0){toast('Informe um valor válido, maior ou igual a zero',1);renderCon();return}
   const it=CON.itens.find(i=>i.cliente_id===CON.sel&&i.item_n===n),kgU=conKgOf(conProduct(it||{}))||3;
   if(f==='baldes'){CON.dirty[n].volumes=Math.round(v*10000)/10000;CON.dirty[n].qtde=Math.round(v*kgU*10000)/10000}
-  else if(f==='kg'){CON.dirty[n].qtde=v;CON.dirty[n].volumes=Math.round(v/kgU*10000)/10000}
   else CON.dirty[n][f]=v;
   renderCon();
 }
+function conMetaBar(client){
+  const m=$('conMeta');if(!m)return;
+  m.innerHTML=`<label>Segmento${conSegSel(client)}</label><label>Etapa${conEtapaSel(client)}</label><label>Probabilidade<span style="display:flex;align-items:center;gap:4px">${conProbIn(client)} %</span></label>`;
+  const any=Object.keys(CON.sim).length;$('conSimAll').classList.toggle('hide',!any);
+}
 function renderConM(client){
-  const s=conMClient(client),uf=s.uf,e=EST.find(x=>x.uf===uf);
+  const s=conMClient(client),uf=s.uf;
   $('conClient').innerHTML=CON.clientes.map(c=>`<option value="${esc(c.id)}" ${c.id===client.id?'selected':''}>${esc(c.nome)} · ${esc(c.concorrente)}</option>`).join('');
   $('conUf').innerHTML=EST.map(x=>`<option value="${esc(x.uf)}" ${x.uf===uf?'selected':''}>${esc(x.uf)} · ${esc(x.nome)}</option>`).join('');
   const dirty=Object.keys(CON.dirty).length;
   $('conSave').classList.toggle('hide',!dirty);$('conSave').disabled=CON.saving||!dirty;$('conSave').textContent='Salvar alterações';
   $('conStatus').textContent=CON.loading?'Carregando…':'Salvo no painel · consumo mensal'+(dirty?' · alterações não salvas':'');
-  const r0=s.rows.find(r=>r.N)||{},N=r0.N,L=r0.L;
-  const comp=x=>x==null?'—':pct0(x);
-  $('conCond').innerHTML=`<b>${esc(client.nome)} · compra de ${esc(client.concorrente)} · UF ${esc(uf)}</b> ${conTags(client.alertas)}<br>
-   <span style="color:#0058b0">Nutríssima · Lucro Real</span>: ICMS ${comp(N?.imPct)} + PIS ${comp(N?.pisPct)} + COFINS ${comp(N?.cofPct)} + frete ${comp(N?.frPct)} + comissão/degustação ${comp(N?.cd)} = <b>${comp(conCarga(N))}</b> por dentro ·
-   <span style="color:#1d7a3a">LBR · Simples</span>: Simples ${comp(L?.imPct)} + frete ${comp(L?.frPct)} + comissão/degustação ${comp(L?.cd)} = <b>${comp(conCarga(L))}</b> por dentro`;
-  const inp=(n,f,v,lab)=>`<input class="conInput" aria-label="${esc(lab)}" inputmode="decimal" value="${v==null?'':esc(fmtIn(v))}" onchange="conMChange(${n},'${f}',this.value)" ${CON.saving?'disabled':''}>`;
-  const mg=(c,b)=>!c||c.m==null?'—':`<strong class="${c.m<0?'c-bad':''}">${brl(c.m)}</strong><div class="sub">por balde · ${pct(c.mp)}</div><div style="margin-top:4px">${conPill(c.mp)}</div>`;
-  $('conMHead').innerHTML=`<tr><th>Produto do concorrente<br>→ equivalente Laben</th><th>Volume/mês</th><th>Concorrente<br>R$/balde · R$/kg</th><th>Laben tabela ${esc(uf)}<br>R$/balde · R$/kg</th><th>Diferença<br>tabela − concorrente</th><th>Proposta<br>R$/balde (editável)</th><th class="gN">Margem<br>Nutríssima · Lucro Real</th><th class="gL">Margem<br>LBR · Simples</th><th>No mês<br>faturamento · margem</th></tr>`;
-  $('conMBody').innerHTML=s.rows.map(r=>{const i=r.i,n=i.item_n;return `<tr>
-    <td><strong>${esc(i.produto)}</strong>${conTags(i.alertas)}<div class="sub">→ ${r.p?esc(nice(r.p.descricao))+' · cód. '+esc(r.p.codigo||'—'):'<span class="c-warn">equivalente não carregado</span>'}</div>
-      <details><summary>Detalhes e alternativa</summary><p>${esc(i.match_obs||'')}</p><p>CMV ${brl(r.cmv)}/balde · sugestão: ${brl(r.sug)} — ${esc(r.why||'')}</p><p>Piso índice ${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}: Nutríssima ${brl(r.pisoN)} · LBR ${brl(r.pisoL)} por balde.</p>${r.chef?`<p><b>Alternativa Linha Chef 3 kg (só análise, ${esc(r.chef.p.codigo)}):</b> CMV ${brl(cmvOf(r.chef.p.chave_cmv))} · margem na proposta: Nutríssima ${brl(r.chef.N.m)} (${pct(r.chef.N.mp)}) · LBR ${brl(r.chef.L.m)} (${pct(r.chef.L.mp)}) por balde.</p>`:''}</details></td>
-    <td>${inp(n,'baldes',r.b?Math.round(r.b*10)/10:null,'Baldes por mês')} <span class="sub">baldes</span><div class="sub">${r.noVol?'<span class="c-warn">volume a informar</span>':conNum(r.kg)+' kg'}</div></td>
-    <td>${inp(n,'preco_unit',r.comp,'Preço do concorrente por balde')}<div class="sub">${brl(r.compKg)}/kg</div><div class="sub">${r.ref?'<span class="c-warn">referência Doremus · cliente SP</span>':'informado pelo cliente'}</div></td>
-    <td><strong>${brl(r.tab)}</strong><div class="sub">${brl(r.tabKg)}/kg</div></td>
-    <td class="${r.gap==null?'':r.gap>0?'c-bad':'c-ok'}"><strong>${r.gap==null?'—':(r.gap>0?'+':'')+brl(r.gap)}</strong><div class="sub">${r.gap==null?'':(r.gap>0?'+':'')+pct(r.gapPct)} · ${r.gap==null?'':r.gap>0?'Laben mais cara':'Laben mais barata'}</div></td>
-    <td>${inp(n,'proposta_unit',r.prop,'Proposta por balde')}<div class="sub">${brl(r.prop==null?null:r.prop/r.kgU)}/kg</div><div class="sub ${r.pGap>0?'c-bad':'c-ok'}">${r.pGap==null?'':(r.pGap>0?'+':'')+brl(r.pGap)+' ('+(r.pGap>0?'+':'')+pct(r.pGapPct)+') vs concorrente'}</div><div class="sub">${r.propManual?'<a href="#" onclick="conMChange('+n+',\'proposta_unit\',\'\');return false">usar sugestão</a>':'sugestão automática'}</div></td>
-    <td class="gN">${mg(r.N)}</td><td class="gL">${mg(r.L)}</td>
-    <td>${r.kg?`<strong>${brl(r.rev)}</strong><div class="sub" style="color:#0058b0">Nutríssima ${brl(r.mN)}</div><div class="sub" style="color:#1d7a3a">LBR ${brl(r.mL)}</div>`:'<span class="c-warn">volume a informar</span>'}</td></tr>`}).join('')+
-    (s.rows.length>1?`<tr class="tot"><td><strong>Total ${esc(client.nome)}</strong></td><td><strong>${conBal(s.b)} baldes</strong><div class="sub">${conNum(s.kg)} kg</div></td><td colspan="4"></td><td class="gN">${conMoney(s.mN,s.pN)}<div class="sub">no mês</div></td><td class="gL">${conMoney(s.mL,s.pL)}<div class="sub">no mês</div></td><td><strong>${brl(s.rev)}</strong></td></tr>`:'');
+  const r0=s.rows.find(r=>r.def)||{},dn=r0.def&&r0.def.n,dl=r0.def&&r0.def.l,c0=x=>x==null?'—':pct0(x);
+  $('conCond').innerHTML=`<b>${esc(client.nome)} · compra de ${esc(client.concorrente)} · UF ${esc(uf)}</b> · ${client.segmento?esc(client.segmento):'segmento não informado'} · ${esc(s.porte)} · ${esc(client.etapa)} ${pct0(s.prob)} ${conTags(client.alertas)}<br>
+   <span style="color:#0058b0">Nutríssima · Lucro Real</span> (padrão ${esc(uf)}): ICMS ${c0(dn?.icms)} + PIS ${c0(dn?.pis)} + COFINS ${c0(dn?.cof)} + frete ${c0(dn?.fr)} + comissão ${c0(dn?.com)} + degustação ${c0(dn?.deg)} = <b>${c0(dn&&conSumN(dn))}</b> ·
+   <span style="color:#1d7a3a">LBR · Simples</span>: Simples ${c0(dl?.simp)} + frete ${c0(dl?.fr)} + comissão ${c0(dl?.com)} + degustação ${c0(dl?.deg)} = <b>${c0(dl&&conSumL(dl))}</b>`;
+  const inp=(n,f,v,lab,w)=>`<input class="conInput" ${w?`style="width:${w}px"`:''} aria-label="${esc(lab)}" inputmode="decimal" value="${v==null?'':esc(fmtIn(v))}" onchange="conMChange(${n},'${f}',this.value)" ${CON.saving?'disabled':''}>`;
+  const mg=(c,car,on)=>!c||c.m==null?'—':`<strong class="${c.m<0?'c-bad':''}">${brl(c.m)}</strong><span class="sub"> /balde</span><div class="sub">${pct(c.mp)} · carga ${pct(car)}${on?' <b class="c-warn">sim.</b>':''}</div><div style="margin-top:3px">${conPill(c.mp)}</div>`;
+  const simIn=(id,emp,f,v,d,lab)=>`<label class="${Math.abs((v||0)-(d||0))>1e-9?'chg':''}">${lab}<span><input class="conInput" style="width:58px" inputmode="decimal" value="${esc(conP(v))}" onchange="conSimSet('${esc(id)}','${emp}','${f}',this.value)"> %</span></label>`;
+  $('conMHead').innerHTML=`<tr><th>Produto<br>concorrente → Laben</th><th>Baldes/mês</th><th>Concorrente<br>R$/balde</th><th>Tabela ${esc(uf)}<br>e diferença</th><th>Proposta<br>R$/balde</th><th class="gN">Nutríssima<br>Lucro Real</th><th class="gL">LBR<br>Simples</th><th>No mês<br>fat. · margem</th><th></th></tr>`;
+  $('conMBody').innerHTML=s.rows.map(r=>{const i=r.i,n=i.item_n,op=!!CON.open[i.id];
+    const main=`<tr class="${op?'conOpen':''}">
+    <td><strong>${esc(i.produto)}</strong>${conTags(i.alertas)}<div class="sub">→ ${r.p?esc(nice(r.p.descricao))+(r.p.codigo?' · '+esc(r.p.codigo):''):'<span class="c-warn">equivalente não carregado</span>'}</div></td>
+    <td>${inp(n,'baldes',r.b?Math.round(r.b*10)/10:null,'Baldes por mês',64)}<div class="sub">${r.noVol?'<span class="c-warn">a informar</span>':conNum(r.kg)+' kg'}</div></td>
+    <td>${inp(n,'preco_unit',r.comp,'Preço do concorrente por balde',72)}<div class="sub">${r.comp==null?'<span class="c-warn">não informado</span>':brl(r.compKg)+'/kg'}</div><div class="sub">${r.comp==null?'':r.ref?'<span class="c-warn">ref. Doremus SP</span>':'pago pelo cliente'}</div></td>
+    <td><strong>${brl(r.tab)}</strong><div class="sub">${brl(r.tabKg)}/kg</div><div class="sub ${r.gap==null?'':r.gap>0?'c-bad':'c-ok'}">${r.gap==null?'':(r.gap>0?'+':'')+brl(r.gap)+' · '+(r.gap>0?'+':'')+pct(r.gapPct)}</div></td>
+    <td>${inp(n,'proposta_unit',r.prop,'Proposta por balde',72)}<div class="sub ${r.pGap>0?'c-bad':'c-ok'}">${r.pGap==null?brl(r.prop==null?null:r.prop/r.kgU)+'/kg':(r.pGap>0?'+':'')+brl(r.pGap)+' ('+(r.pGap>0?'+':'')+pct(r.pGapPct)+') vs conc.'}</div><div class="sub">${r.propManual?'<a href="#" onclick="conMChange('+n+',\'proposta_unit\',\'\');return false">usar sugestão</a>':'sugestão'}</div></td>
+    <td class="gN">${mg(r.N,r.carN,r.simN)}</td><td class="gL">${mg(r.L,r.carL,r.simL)}</td>
+    <td>${r.kg?`<strong>${brl(r.rev)}</strong><div class="sub" style="color:#0058b0">Nutríssima ${brl(r.mN)}</div><div class="sub" style="color:#1d7a3a">LBR ${brl(r.mL)}</div>`:'<span class="c-warn">volume a informar</span>'}</td>
+    <td><button class="btn ${r.simOn?'':'sec'} tiny" type="button" onclick="conToggle('${esc(i.id)}')" aria-expanded="${op}">${op?'Fechar':'Simular'}</button></td></tr>`;
+    const sim=!op||!r.def?'':`<tr class="conSimRow"><td colspan="9"><div class="conSim">
+      <div class="conSimG gN"><b style="color:#0058b0">Nutríssima · Lucro Real</b><div class="conSimF">${simIn(i.id,'n','icms',r.tN.icms,r.def.n.icms,'ICMS')}${simIn(i.id,'n','pis',r.tN.pis,r.def.n.pis,'PIS')}${simIn(i.id,'n','cof',r.tN.cof,r.def.n.cof,'COFINS')}${simIn(i.id,'n','fr',r.tN.fr,r.def.n.fr,'Frete')}${simIn(i.id,'n','com',r.tN.com,r.def.n.com,'Comissão')}${simIn(i.id,'n','deg',r.tN.deg,r.def.n.deg,'Degustação')}</div><div class="sub">Carga ${pct(r.carN)} (padrão ${pct(conSumN(r.def.n))}) · margem ${brl(r.N&&r.N.m)}/balde · ${pct(r.N&&r.N.mp)} · índice ${idx(r.N&&r.N.mp)} · mês ${brl(r.mN)} · preço mínimo índice ${conIdxMin()}: ${brl(r.pisoN)}</div></div>
+      ${r.tL?`<div class="conSimG gL"><b style="color:#1d7a3a">LBR · Simples</b><div class="conSimF">${simIn(i.id,'l','simp',r.tL.simp,r.def.l.simp,'Simples')}${simIn(i.id,'l','fr',r.tL.fr,r.def.l.fr,'Frete')}${simIn(i.id,'l','com',r.tL.com,r.def.l.com,'Comissão')}${simIn(i.id,'l','deg',r.tL.deg,r.def.l.deg,'Degustação')}</div><div class="sub">Carga ${pct(r.carL)} (padrão ${pct(conSumL(r.def.l))}) · margem ${brl(r.L&&r.L.m)}/balde · ${pct(r.L&&r.L.mp)} · índice ${idx(r.L&&r.L.mp)} · mês ${brl(r.mL)} · preço mínimo índice ${conIdxMin()}: ${brl(r.pisoL)}</div></div>`:'<div class="conSimG"><span class="c-warn">LBR sem alíquota do Simples cadastrada.</span></div>'}
+      <div class="conSimA"><button class="btn sec tiny" type="button" onclick="conSimReset('${esc(i.id)}')" ${r.simOn?'':'disabled'}>Resetar</button><div class="sub">Só análise: não grava na aba Estados.</div></div>
+      <div class="conSimX">CMV ${brl(r.cmv)}/balde · sugestão ${brl(r.sug)}: ${esc(r.why||'')}${r.chef?` · <b>Linha Chef 3 kg (${esc(r.chef.p.codigo)}, só análise)</b>: CMV ${brl(r.chef.cmv)} → Nutríssima ${brl(r.chef.N.m)} (${pct(r.chef.N.mp)}) · LBR ${brl(r.chef.L.m)} (${pct(r.chef.L.mp)}) por balde`:''}${i.match_obs?' · '+esc(i.match_obs):''}</div>
+    </div></td></tr>`;
+    return main+sim}).join('')+
+    (s.rows.length>1?`<tr class="tot"><td><strong>Total ${esc(client.nome)}</strong></td><td><strong>${conBal(s.b)}</strong><div class="sub">${conNum(s.kg)} kg</div></td><td colspan="3"></td><td class="gN">${conMoney(s.mN,s.pN)}<div class="sub">no mês</div></td><td class="gL">${conMoney(s.mL,s.pL)}<div class="sub">no mês</div></td><td><strong>${brl(s.rev)}</strong></td><td></td></tr>`:'');
   const best=s.mN!=null&&s.mL!=null?(s.mL>=s.mN?'LBR':'Nutríssima'):null;
-  $('conMNotes').innerHTML=`${best&&s.kg?(Math.abs(s.mL-s.mN)<0.005?'<b>Com a carga atual deste estado, Nutríssima e LBR deixam a mesma margem.</b><br>':`<b>Faturando pela ${best} sobra mais: ${brl(Math.abs(s.mL-s.mN))}/mês a mais.</b><br>`):''}
-   Margem = proposta − CMV − proposta × carga do estado (${esc(uf)}), por dentro. Índice = margem × 10 (5,0 = 50%); verde a partir de ${ORC_MIN.toLocaleString('pt-BR',{minimumFractionDigits:1})}, o mesmo mínimo do Orçamento. Cliente B2B contribuinte de ICMS, sem DIFAL.<br>
-   Sugestão de proposta: se o preço do concorrente foi informado, o maior preço R$ 1,00 abaixo dele (limitado à tabela), desde que a LBR fique no índice mínimo; sem preço real, a tabela do estado. Altere à vontade e clique em <b>Salvar alterações</b>. Produtos e CMVs não são alterados aqui.<br>
+  $('conMNotes').innerHTML=`${best&&s.kg?(Math.abs(s.mL-s.mN)<0.005?'<b>Nutríssima e LBR deixam a mesma margem com esta carga.</b><br>':`<b>Faturando pela ${best} sobra mais: ${brl(Math.abs(s.mL-s.mN))}/mês a mais.</b><br>`):''}
+   Margem = proposta − CMV − proposta × carga (por dentro). Índice = margem × 10 (5,0 = 50%); verde a partir de ${conIdxMin()}, o mesmo mínimo do Orçamento. Cliente B2B contribuinte de ICMS, sem DIFAL.<br>
+   <b>Simular</b> abre ICMS, PIS, COFINS, frete, comissão e degustação da linha (padrão = estado ${esc(uf)}); a margem recalcula na hora e nada é gravado na aba Estados. Baldes, preço do concorrente e proposta ficam salvos com <b>Salvar alterações</b>.<br>
+   Sugestão de proposta: com preço pago informado, R$ 1,00 abaixo dele (limitado à tabela), desde que a LBR fique no índice mínimo; sem preço ou com preço de referência, a tabela do estado.
    <details><summary>Fonte e premissas</summary><p>${esc(client.fonte||'')} · ${esc(client.obs||'')}</p></details>`;
 }
 
